@@ -194,7 +194,6 @@ class AssettoCorsaReader:
     @staticmethod
     def _open_single_mmap(tag_base: str, struct_cls):
         size = ctypes.sizeof(struct_cls)
-        # Tente l'espace de nommage Windows 'Local\\' puis le nom direct avec accès lecture seule
         for tag in (f"Local\\{tag_base}", tag_base):
             for fileno in (-1, 0):
                 try:
@@ -226,16 +225,17 @@ class AssettoCorsaReader:
         Retourne un dictionnaire avec 'connected': True et les valeurs, ou {'connected': False} si absent/fermé.
         """
         if not self._open():
-            return {"connected": False}
+            return {"connected": False, "sim": "Assetto Corsa"}
 
         try:
-            physics = SPageFilePhysics.from_buffer(self.mmap_physics)
-            graphics = SPageFileGraphic.from_buffer(self.mmap_graphics)
+            physics = SPageFilePhysics.from_buffer_copy(self.mmap_physics)
+            graphics = SPageFileGraphic.from_buffer_copy(self.mmap_graphics)
 
             # status: 0=OFF, 1=REPLAY, 2=LIVE, 3=PAUSE
             if graphics.status not in (2, 3) or physics.packetId == 0:
                 return {
                     "connected": False,
+                    "sim": "Assetto Corsa",
                     "status": int(graphics.status)
                 }
 
@@ -244,21 +244,43 @@ class AssettoCorsaReader:
 
             pressures = [round(float(p) / PSI_TO_BAR, 2) for p in physics.wheelsPressure]
             temps = [round(float(t), 1) for t in physics.tyreCoreTemperature]
+            brakes = [round(float(b), 1) for b in physics.brakeTemp]
+            wear = [round((1.0 - float(w)) * 100.0, 1) for w in physics.tyreWear]
+
+            tyre_thermal_3zones = []
+            for i in range(4):
+                inside = round(float(physics.tyreTempI[i]), 1)
+                middle = round(float(physics.tyreTempM[i]), 1)
+                outside = round(float(physics.tyreTempO[i]), 1)
+                if inside <= 0.0 and middle <= 0.0 and temps[i] > 0.0:
+                    inside = middle = outside = temps[i]
+                tyre_thermal_3zones.append({
+                    "inside": inside,
+                    "middle": middle,
+                    "outside": outside
+                })
 
             max_rpm = 8000
             max_fuel = 100.0
+            car_name = ""
+            track_name = ""
             if self.mmap_static is not None:
                 try:
-                    static = SPageFileStatic.from_buffer(self.mmap_static)
+                    static = SPageFileStatic.from_buffer_copy(self.mmap_static)
                     if static.maxRpm > 0:
                         max_rpm = int(static.maxRpm)
                     if static.maxFuel > 0:
                         max_fuel = round(float(static.maxFuel), 1)
+                    car_name = str(static.carModel).strip()
+                    track_name = str(static.track).strip()
                 except Exception:
                     pass
 
             return {
                 "connected": True,
+                "sim": "Assetto Corsa",
+                "in_game": (graphics.status == 2),
+                "is_paused": (graphics.status == 3),
                 "speedKmh": round(float(physics.speedKmh), 1),
                 "gear": gear,
                 "gearStr": gear_str,
@@ -266,6 +288,9 @@ class AssettoCorsaReader:
                 "fuel": round(float(physics.fuel), 1),
                 "wheelsPressure": pressures,
                 "tyreCoreTemperature": temps,
+                "tyreThermal3Zones": tyre_thermal_3zones,
+                "tyreWear": wear,
+                "brakeTemp": brakes,
                 "brakeBias": round(float(physics.brakeBias) * 100.0, 1) if physics.brakeBias > 0 else 0.0,
                 "status": int(graphics.status),
                 "currentTime": str(graphics.currentTime).strip(),
@@ -279,10 +304,12 @@ class AssettoCorsaReader:
                 "maxFuel": max_fuel,
                 "airTemp": round(float(physics.airTemp), 1),
                 "roadTemp": round(float(physics.roadTemp), 1),
+                "carName": car_name,
+                "trackName": track_name,
             }
         except Exception:
             self.close()
-            return {"connected": False}
+            return {"connected": False, "sim": "Assetto Corsa"}
 
     def close(self):
         for attr in ("mmap_physics", "mmap_graphics", "mmap_static"):

@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 
-TARGET_PROCESSES = ["AMS2AVX.exe", "acs.exe"]
+TARGET_PROCESSES = ["AMS2AVX.exe", "AMS2.exe", "acs.exe"]
 DEFAULT_TARGET_GAMES = TARGET_PROCESSES
 
 def get_adb_binary() -> str:

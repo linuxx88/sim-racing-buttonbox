@@ -1,41 +1,43 @@
 """
 Serveur de diffusion HTTP et télémétrie temps réel SSE (Server-Sent Events) pour Sim Box Bridge.
-Diffuse les trames de télémétrie Assetto Corsa sur '/telemetry' à 30 Hz (30 fps).
+Diffuse les trames de télémétrie unifiées (AMS2, Assetto Corsa) sur '/telemetry' à 30 Hz (30 fps).
 """
 
 import asyncio
 import http
 import json
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 import websockets
 
 try:
-    from telemetry_ac import get_ac_reader, AssettoCorsaReader
+    from telemetry_manager import get_telemetry_manager, TelemetryManager
 except ImportError:
-    from sim_box_bridge.telemetry_ac import get_ac_reader, AssettoCorsaReader
+    from sim_box_bridge.telemetry_manager import get_telemetry_manager, TelemetryManager
 
 DEFAULT_FPS = 30
 
 
-async def telemetry_stream(reader: AssettoCorsaReader, fps: int = DEFAULT_FPS) -> AsyncGenerator[str, None]:
+async def telemetry_stream(manager: Optional[TelemetryManager] = None, fps: int = DEFAULT_FPS) -> AsyncGenerator[str, None]:
     """
     Générateur asynchrone SSE produisant des trames de télémétrie cadencées à `fps` images par seconde.
     """
+    if manager is None:
+        manager = get_telemetry_manager()
     interval = 1.0 / float(fps)
     while True:
-        data = reader.read()
+        data = manager.read()
         payload = f"data: {json.dumps(data)}\n\n"
         yield payload
         await asyncio.sleep(interval)
 
 
-async def handle_sse_telemetry(connection, request, reader: AssettoCorsaReader = None, fps: int = DEFAULT_FPS):
+async def handle_sse_telemetry(connection, request, manager: Optional[TelemetryManager] = None, fps: int = DEFAULT_FPS):
     """
     Traite la requête HTTP GET /telemetry en injectant les en-têtes SSE
     et en diffusant le flux text/event-stream à 30 Hz.
     """
-    if reader is None:
-        reader = get_ac_reader()
+    if manager is None:
+        manager = get_telemetry_manager()
 
     transport = connection.transport
     headers = (
@@ -50,7 +52,7 @@ async def handle_sse_telemetry(connection, request, reader: AssettoCorsaReader =
     interval = 1.0 / float(fps)
     try:
         while not transport.is_closing():
-            data = reader.read()
+            data = manager.read()
             frame = f"data: {json.dumps(data)}\n\n"
             transport.write(frame.encode("utf-8"))
             await asyncio.sleep(interval)
