@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Sim Racing Button Box</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body { background: #111; color: #eee; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; height: 100dvh; padding: 12px; overflow: hidden; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .status-badge { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: bold; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #e74c3c; transition: background 0.3s; }
+    .status-dot.connected { background: #2ecc71; }
+    .tabs-nav { display: flex; gap: 8px; margin-bottom: 10px; }
+    .tab-btn { flex: 1; padding: 10px; background: #222; border: 2px solid #333; border-radius: 8px; color: #aaa; font-size: 15px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+    .tab-btn.active { background: #34495e; border-color: #3498db; color: #fff; }
+    .panels-container { flex: 1; display: flex; overflow: hidden; }
+    .tab-panel { display: none; width: 100%; height: 100%; }
+
+    /* Boutons génériques */
+    .btn { background: #222; border: 2px solid #444; border-radius: 10px; color: #fff; font-size: 16px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; touch-action: manipulation; transition: background 0.1s, border-color 0.1s; }
+    .btn:active, .btn.active { background: #3498db; border-color: #5dade2; }
+
+    /* Onglet Course - Compact Zéro Défilement */
+    #tab-course.active { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; height: 100%; }
+    #btn-drs { height: 75px; min-height: 70px; width: 100%; font-size: 22px; letter-spacing: 2px; background: #1a1a1a; border: 2px solid #f39c12; color: #f39c12; }
+    #btn-drs:active { background: #d35400; color: #fff; }
+
+    .stepper-card {
+      display: grid;
+      grid-template-columns: 85px 1fr 85px;
+      align-items: center;
+      background: #181818;
+      border: 2px solid #333;
+      border-radius: 10px;
+      padding: 4px 8px;
+      gap: 8px;
+      box-sizing: border-box;
+      height: 70px;
+      min-height: 65px;
+      flex-shrink: 0;
+    }
+    .stepper-header { text-align: center; display: flex; flex-direction: column; justify-content: center; }
+    .stepper-title { font-size: 13px; font-weight: bold; color: #eee; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stepper-subtitle { font-size: 11px; font-weight: 600; color: #777; margin-top: 1px; }
+
+    .stepper-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      border-radius: 8px;
+      background: #252525;
+      border: 2px solid #3a3a3a;
+      cursor: pointer;
+      padding: 2px;
+    }
+    .stepper-btn-title { font-size: 10px; font-weight: bold; color: #bbb; text-transform: uppercase; line-height: 1.1; text-align: center; }
+    .stepper-btn-symbol { font-size: 28px; font-weight: bold; line-height: 1; color: #3498db; margin-top: 1px; }
+
+    /* Code Couleur par fonction */
+    .card-bias { border-color: rgba(231, 76, 60, 0.4); }
+    .card-bias .stepper-title { color: #e74c3c; }
+    .card-bias .stepper-btn-symbol { color: #e74c3c; }
+    .card-bias .stepper-btn:active { background: #c0392b; border-color: #e74c3c; color: #fff; }
+
+    .card-tc { border-color: rgba(0, 206, 201, 0.4); }
+    .card-tc .stepper-title { color: #00cec9; }
+    .card-tc .stepper-btn-symbol { color: #00cec9; }
+    .card-tc .stepper-btn:active { background: #0984e3; border-color: #00cec9; color: #fff; }
+
+    .card-eb { border-color: rgba(162, 155, 254, 0.4); }
+    .card-eb .stepper-title { color: #a29bfe; }
+    .card-eb .stepper-btn-symbol { color: #a29bfe; }
+    .card-eb .stepper-btn:active { background: #6c5ce7; border-color: #a29bfe; color: #fff; }
+
+    .card-abs { border-color: rgba(253, 203, 110, 0.4); }
+    .card-abs .stepper-title { color: #fdcb6e; }
+    .card-abs .stepper-btn-symbol { color: #fdcb6e; }
+    .card-abs .stepper-btn:active { background: #e17055; border-color: #fdcb6e; color: #fff; }
+
+    .card-lights { border-color: rgba(223, 230, 233, 0.4); }
+    .card-lights .stepper-title { color: #dfe6e9; }
+    .card-lights .stepper-btn:active { background: #636e72; border-color: #dfe6e9; color: #fff; }
+
+    .card-utilities { border-color: rgba(243, 156, 18, 0.4); }
+    .card-utilities .stepper-title { color: #f39c12; }
+    .card-utilities .stepper-btn:active { background: #d35400; border-color: #f39c12; color: #fff; }
+
+    /* Onglet Cockpit - Groupes & Flèches Directionnelles */
+    #tab-cockpit.active { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; height: 100%; }
+    .cockpit-group {
+      background: #181818;
+      border: 2px solid #2e2e2e;
+      border-radius: 10px;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .cockpit-group-title {
+      font-size: 11px;
+      font-weight: bold;
+      color: #3498db;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .cockpit-grid-2x2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .cockpit-btn {
+      min-height: 48px;
+      font-size: 13px;
+      font-weight: bold;
+      border-radius: 8px;
+      gap: 6px;
+      background: #242424;
+      border: 1px solid #3c3c3c;
+    }
+    .cockpit-btn:active, .cockpit-btn.active {
+      background: #2980b9;
+      border-color: #3498db;
+    }
+    .cockpit-btn-symbol { font-size: 15px; color: #3498db; font-weight: bold; }
+
+    /* Mode Immersion Dashboard Plein Écran */
+    body.dash-active {
+      padding: 0 !important;
+      background: #000000;
+    }
+    body.dash-active header,
+    body.dash-active .tabs-nav {
+      display: none !important;
+    }
+    body.dash-active .panels-container {
+      height: 100% !important;
+      height: 100dvh !important;
+    }
+    body.dash-active #tab-dashboard.active {
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      height: 100% !important;
+      height: 100dvh !important;
+    }
+
+    /* Onglet Dashboard GT3 Telemetry */
+    #tab-dashboard {
+      background: #000000;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+      user-select: none;
+      position: relative;
+    }
+    #tab-dashboard.active {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+      box-sizing: border-box;
+      border: 1px solid #222;
+      border-radius: 10px;
+      overflow: hidden;
+      padding: 4px 6px;
+    }
+    .dash-controls-floating {
+      position: absolute;
+      top: 10px;
+      left: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 100;
+    }
+    .dash-icon-btn {
+      opacity: 0.25;
+      font-size: 22px;
+      color: #ffffff;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      line-height: 1;
+      padding: 6px;
+      transition: opacity 0.2s;
+    }
+    .dash-icon-btn:hover, .dash-icon-btn:active {
+      opacity: 0.85;
+    }
+
+    .shift_lights {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 7px;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+    .led {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #181818;
+      border: 1px solid #282828;
+    }
+    .led.active-green { background: #00e676; box-shadow: 0 0 10px #00e676; border-color: #00e676; }
+    .led.active-red { background: #ff1744; box-shadow: 0 0 10px #ff1744; border-color: #ff1744; }
+    .led.active-blue { background: #2979ff; box-shadow: 0 0 10px #2979ff; border-color: #2979ff; }
+
+    .main_grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr 1.15fr;
+      align-items: center;
+      padding: 0 16px;
+      flex: 1;
+      gap: 8px;
+    }
+    .dash-left {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-left: 10px;
+    }
+    .dash-label {
+      color: #888888;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .lap-time-val {
+      color: #888888;
+      font-size: 30px;
+      font-weight: 700;
+      font-family: monospace;
+      line-height: 1.1;
+    }
+    .delta-label {
+      font-size: 10px;
+      margin-top: 4px;
+    }
+    .delta-val {
+      color: #888888;
+      font-size: 44px;
+      font-weight: 800;
+      font-family: monospace;
+      line-height: 1;
+    }
+    .race-info-row {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-top: 4px;
+    }
+    .lap-counter {
+      color: #888888;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .pos-val {
+      color: #888888;
+      font-size: 22px;
+      font-weight: 900;
+      margin-top: 2px;
+    }
+    .dash-center {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+    }
+    .gear-val {
+      color: #ffffff;
+      font-size: 150px;
+      font-weight: 900;
+      line-height: 0.85;
+    }
+    .speed-block {
+      display: flex;
+      flex-direction: column;
+      margin-left: 10px;
+    }
+    .speed-val {
+      color: #ffffff;
+      font-size: 30px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .speed-unit {
+      color: #aaaaaa;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+    .dash-right {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding-right: 10px;
+    }
+    .tyres-header {
+      color: #aaaaaa;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .car-diagram {
+      position: relative;
+      width: 140px;
+      height: 130px;
+      margin: 2px auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .car-chassis-svg {
+      display: block;
+    }
+    .wheel-badge {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: monospace;
+      min-width: 30px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1.5px solid #333333;
+      color: #777777;
+    }
+    .wheel-fl { top: 6px; left: 0; }
+    .wheel-fr { top: 6px; right: 0; }
+    .wheel-rl { bottom: 6px; left: 0; }
+    .wheel-rr { bottom: 6px; right: 0; }
+    .wheel-fl.opt, .wheel-fr.opt { background: rgba(0, 230, 118, 0.15); border-color: #00e676; color: #00e676; }
+    .wheel-rl.opt, .wheel-rr.opt { background: rgba(255, 145, 0, 0.15); border-color: #ff9100; color: #ff9100; }
+    .wheel-press { font-size: 10px; font-weight: 800; line-height: 1; }
+    .wheel-temp { font-size: 8px; opacity: 0.9; margin-top: 1px; }
+    .tyres-sub {
+      color: #777777;
+      font-size: 10px;
+      text-align: center;
+      margin-top: 3px;
+    }
+    .footer_telemetry_bar {
+      border-top: 1px solid #222222;
+      padding: 6px 12px;
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+      font-family: monospace;
+      font-size: 11px;
+      color: #cccccc;
+      white-space: nowrap;
+      overflow: hidden;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    /* Menu & Tiroir (Drawer) */
+    .icon-btn {
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 18px;
+      line-height: 1;
+      padding: 6px 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-btn:active { background: #333; }
+    .drawer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(2px);
+      z-index: 99;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    .drawer-overlay.active { opacity: 1; visibility: visible; }
+    #mapping-drawer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 85%;
+      max-width: 340px;
+      height: 100vh;
+      background: #181818;
+      border-right: 2px solid #333;
+      z-index: 100;
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.6);
+      padding: 16px;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+    #mapping-drawer.active { transform: translateX(0); }
+    .drawer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #333;
+      padding-bottom: 12px;
+    }
+    .drawer-title { font-size: 18px; font-weight: bold; color: #3498db; }
+    .btn-close {
+      background: none;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 18px;
+      line-height: 1;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .btn-close:active { background: #333; }
+    .mapping-section-title {
+      font-size: 13px;
+      font-weight: bold;
+      color: #f39c12;
+      text-transform: uppercase;
+      margin-top: 14px;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+    .mapping-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .mapping-table th, .mapping-table td {
+      padding: 7px 6px;
+      text-align: left;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .mapping-table th {
+      color: #888;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+    .mapping-table td.key-badge {
+      text-align: right;
+      font-family: monospace;
+      font-weight: bold;
+      color: #2ecc71;
+    }
+  </style>
+</head>
+<body>
+  <div id="drawer-overlay" class="drawer-overlay"></div>
+  <aside id="mapping-drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">Guide des Touches</div>
+      <button id="btn-close-drawer" class="btn-close" aria-label="Fermer">✕</button>
+    </div>
+
+    <div class="mapping-section-title">Commandes Course</div>
+    <table class="mapping-table">
+      <thead>
+        <tr><th>Fonction</th><th style="text-align:right;">Touche</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>DRS</td><td class="key-badge">[D]</td></tr>
+        <tr><td>Bias Frein +/-</td><td class="key-badge">[V / B]</td></tr>
+        <tr><td>TC +/-</td><td class="key-badge">[N / M]</td></tr>
+        <tr><td>Frein moteur +/-</td><td class="key-badge">[U / J]</td></tr>
+        <tr><td>ABS +/-</td><td class="key-badge">[Y / H]</td></tr>
+        <tr><td>Phares (On/Off)</td><td class="key-badge">[L]</td></tr>
+        <tr><td>High Beam / Flash</td><td class="key-badge">[K]</td></tr>
+        <tr><td>Essuie-glaces</td><td class="key-badge">[O]</td></tr>
+        <tr><td>Pit Limiter</td><td class="key-badge">[P]</td></tr>
+      </tbody>
+    </table>
+
+    <div class="mapping-section-title">Commandes Cockpit</div>
+    <table class="mapping-table">
+      <thead>
+        <tr><th>Fonction</th><th style="text-align:right;">Touche</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Siège Haut / Bas</td><td class="key-badge">[W / S] ▲ ▼</td></tr>
+        <tr><td>Siège Avance / Recule</td><td class="key-badge">[Q / E] ◄ ►</td></tr>
+        <tr><td>Pitch Haut / Bas</td><td class="key-badge">[R / F] ▲ ▼</td></tr>
+        <tr><td>Yaw Gauche / Droite</td><td class="key-badge">[Z / C] ◄ ►</td></tr>
+        <tr><td>FOV +/-</td><td class="key-badge">[T / G] + -</td></tr>
+      </tbody>
+    </table>
+  </aside>
+
+  <header>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button id="btn-hamburger" class="icon-btn" aria-label="Menu Mappings">☰</button>
+      <button id="btn-fullscreen" class="icon-btn" aria-label="Plein Écran">⛶</button>
+      <h1>Button Box</h1>
+    </div>
+    <div class="status-badge">
+      <span id="status-dot" class="status-dot"></span>
+      <span id="status-text">Déconnecté</span>
+    </div>
+  </header>
+
+  <nav class="tabs-nav">
+    <button class="tab-btn active" data-tab="tab-course">Course</button>
+    <button class="tab-btn" data-tab="tab-cockpit">Cockpit</button>
+    <button class="tab-btn" data-tab="tab-dashboard">Dashboard</button>
+  </nav>
+
+  <main class="panels-container">
+    <!-- Onglet Course -->
+    <div id="tab-course" class="tab-panel active">
+      <button id="btn-drs" class="btn">DRS</button>
+
+      <div class="stepper-card card-bias">
+        <button id="btn-bias-inc" class="btn stepper-btn">
+          <span class="stepper-btn-title">Avant</span>
+          <span class="stepper-btn-symbol">+</span>
+        </button>
+        <div class="stepper-header">
+          <div class="stepper-title">Répartition Freinage</div>
+          <div class="stepper-subtitle">Avant / Arrière</div>
+        </div>
+        <button id="btn-bias-dec" class="btn stepper-btn">
+          <span class="stepper-btn-title">Arrière</span>
+          <span class="stepper-btn-symbol">-</span>
+        </button>
+      </div>
+
+      <div class="stepper-card card-tc">
+        <button id="btn-tc-inc" class="btn stepper-btn">
+          <span class="stepper-btn-title">Augmenter</span>
+          <span class="stepper-btn-symbol">+</span>
+        </button>
+        <div class="stepper-header">
+          <div class="stepper-title">Contrôle Traction</div>
+          <div class="stepper-subtitle">TC (+ / -)</div>
+        </div>
+        <button id="btn-tc-dec" class="btn stepper-btn">
+          <span class="stepper-btn-title">Diminuer</span>
+          <span class="stepper-btn-symbol">-</span>
+        </button>
+      </div>
+
+      <div class="stepper-card card-eb">
+        <button id="btn-eb-inc" class="btn stepper-btn">
+          <span class="stepper-btn-title">Augmenter</span>
+          <span class="stepper-btn-symbol">+</span>
+        </button>
+        <div class="stepper-header">
+          <div class="stepper-title">Frein Moteur</div>
+          <div class="stepper-subtitle">EB (+ / -)</div>
+        </div>
+        <button id="btn-eb-dec" class="btn stepper-btn">
+          <span class="stepper-btn-title">Diminuer</span>
+          <span class="stepper-btn-symbol">-</span>
+        </button>
+      </div>
+
+      <div class="stepper-card card-abs">
+        <button id="btn-abs-inc" class="btn stepper-btn">
+          <span class="stepper-btn-title">Augmenter</span>
+          <span class="stepper-btn-symbol">+</span>
+        </button>
+        <div class="stepper-header">
+          <div class="stepper-title">Système ABS</div>
+          <div class="stepper-subtitle">ABS (+ / -)</div>
+        </div>
+        <button id="btn-abs-dec" class="btn stepper-btn">
+          <span class="stepper-btn-title">Diminuer</span>
+          <span class="stepper-btn-symbol">-</span>
+        </button>
+      </div>
+
+      <div class="stepper-card card-lights">
+        <button id="btn-headlights-toggle" class="btn stepper-btn">
+          <span class="stepper-btn-title">PHARES</span>
+          <span class="stepper-btn-title" style="color: #dfe6e9; font-size: 9px; margin-top: 2px;">(ON/OFF)</span>
+        </button>
+        <div class="stepper-header">
+          <div class="stepper-title">ÉCLAIRAGE</div>
+        </div>
+        <button id="btn-headlights-flash" class="btn stepper-btn">
+          <span class="stepper-btn-title">HIGH BEAM</span>
+          <span class="stepper-btn-title" style="color: #dfe6e9; font-size: 9px; margin-top: 2px;">/ FLASH</span>
+        </button>
+      </div>
+
+      <div class="stepper-card card-utilities">
+        <button id="btn-wipers-cycle" class="btn stepper-btn">
+          <span class="stepper-btn-title">ESSUIE-GLACES</span>
+          <span class="stepper-btn-title" style="color: #00cec9; font-size: 9px; margin-top: 2px;">(CYCLE)</span>
+        </button>
+        <div class="stepper-header">
+          <div class="stepper-title">SERVICES PISTE</div>
+        </div>
+        <button id="btn-pit-limiter" class="btn stepper-btn">
+          <span class="stepper-btn-title">PIT LIMITER</span>
+          <span class="stepper-btn-title" style="color: #e74c3c; font-size: 9px; margin-top: 2px;">(ON/OFF)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Onglet Cockpit -->
+    <div id="tab-cockpit" class="tab-panel">
+      <!-- Section Réglages Siège -->
+      <div class="cockpit-group">
+        <div class="cockpit-group-title">Position Siège</div>
+        <div class="cockpit-grid-2x2">
+          <button id="btn-seat-up" class="btn cockpit-btn">
+            <span>Siège Haut</span><span class="cockpit-btn-symbol">▲</span>
+          </button>
+          <button id="btn-seat-down" class="btn cockpit-btn">
+            <span>Siège Bas</span><span class="cockpit-btn-symbol">▼</span>
+          </button>
+          <button id="btn-seat-forward" class="btn cockpit-btn">
+            <span>Avance</span><span class="cockpit-btn-symbol">◄</span>
+          </button>
+          <button id="btn-seat-backward" class="btn cockpit-btn">
+            <span>Recule</span><span class="cockpit-btn-symbol">►</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Section Caméra Pitch / Yaw -->
+      <div class="cockpit-group">
+        <div class="cockpit-group-title">Angle Caméra (Pitch & Yaw)</div>
+        <div class="cockpit-grid-2x2">
+          <button id="btn-pitch-up" class="btn cockpit-btn">
+            <span>Pitch Haut</span><span class="cockpit-btn-symbol">▲</span>
+          </button>
+          <button id="btn-pitch-down" class="btn cockpit-btn">
+            <span>Pitch Bas</span><span class="cockpit-btn-symbol">▼</span>
+          </button>
+          <button id="btn-yaw-left" class="btn cockpit-btn">
+            <span>Yaw Gauche</span><span class="cockpit-btn-symbol">◄</span>
+          </button>
+          <button id="btn-yaw-right" class="btn cockpit-btn">
+            <span>Yaw Droite</span><span class="cockpit-btn-symbol">►</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Section Champ de Vision -->
+      <div class="cockpit-group">
+        <div class="cockpit-group-title">Champ de Vision (FOV)</div>
+        <div class="cockpit-grid-2x2">
+          <button id="btn-fov-inc" class="btn cockpit-btn">
+            <span>Zoom</span><span class="cockpit-btn-symbol">+</span>
+          </button>
+          <button id="btn-fov-dec" class="btn cockpit-btn">
+            <span>Dézoom</span><span class="cockpit-btn-symbol">-</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Onglet Dashboard GT3 Telemetry -->
+    <div id="tab-dashboard" class="tab-panel">
+      <!-- Boutons Contrôle Flottants Discrets -->
+      <div class="dash-controls-floating">
+        <button id="btn-dash-exit" class="dash-icon-btn" aria-label="Quitter le Dashboard">✕</button>
+        <button id="btn-dash-fullscreen" class="dash-icon-btn" aria-label="Plein Écran">⛶</button>
+      </div>
+
+      <!-- 1. Shift Lights (16 LEDs) -->
+      <div class="shift_lights">
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+      </div>
+
+      <!-- 2. Main Grid -->
+      <div class="main_grid">
+        <!-- Colonne Gauche -->
+        <div class="dash-left">
+          <div class="dash-label">TEMPS AU TOUR</div>
+          <div id="dash-lap-time" class="lap-time-val">0:00.00</div>
+          <div class="dash-label delta-label">DELTA DE TEMPS AU TOUR</div>
+          <div id="dash-delta" class="delta-val">0.00</div>
+          <div class="race-info-row">
+            <div>
+              <div class="dash-label" style="font-size: 9px;">TOUR</div>
+              <div id="dash-lap" class="lap-counter">LAP 0/0</div>
+            </div>
+            <div>
+              <div class="dash-label" style="font-size: 9px;">POS</div>
+              <div id="dash-pos" class="pos-val">P0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Colonne Centre -->
+        <div class="dash-center">
+          <div id="dash-gear" class="gear-val">0</div>
+          <div class="speed-block">
+            <div id="dash-speed" class="speed-val">0</div>
+            <div class="speed-unit">km/h</div>
+          </div>
+        </div>
+
+        <!-- Colonne Droite -->
+        <div class="dash-right">
+          <div class="tyres-header">4 PNEUS</div>
+          <div class="car-diagram">
+            <svg class="car-chassis-svg" viewBox="0 0 70 130" width="70" height="130">
+              <path d="M 22,8 C 26,4 44,4 48,8 L 54,24 C 55,30 50,38 50,46 L 51,78 C 51,86 56,92 56,104 L 54,118 C 46,122 24,122 16,118 L 14,104 C 14,92 19,86 19,78 L 20,46 C 20,38 15,30 16,24 Z" 
+                    fill="#151515" stroke="#2a2a2a" stroke-width="2" />
+              <path d="M 24,38 Q 35,32 46,38 L 44,66 Q 35,70 26,66 Z" fill="#202020" stroke="#2a2a2a" stroke-width="1.5" />
+              <line x1="8" y1="122" x2="62" y2="122" stroke="#2a2a2a" stroke-width="3" stroke-linecap="round" />
+              <line x1="22" y1="118" x2="22" y2="122" stroke="#2a2a2a" stroke-width="1.5" />
+              <line x1="48" y1="118" x2="48" y2="122" stroke="#2a2a2a" stroke-width="1.5" />
+            </svg>
+            <div id="dash-wheel-fl" class="wheel-badge wheel-fl">
+              <span id="dash-fl-press" class="wheel-press">0.00</span>
+              <span id="dash-fl-temp" class="wheel-temp">0°C</span>
+            </div>
+            <div id="dash-wheel-fr" class="wheel-badge wheel-fr">
+              <span id="dash-fr-press" class="wheel-press">0.00</span>
+              <span id="dash-fr-temp" class="wheel-temp">0°C</span>
+            </div>
+            <div id="dash-wheel-rl" class="wheel-badge wheel-rl">
+              <span id="dash-rl-press" class="wheel-press">0.00</span>
+              <span id="dash-rl-temp" class="wheel-temp">0°C</span>
+            </div>
+            <div id="dash-wheel-rr" class="wheel-badge wheel-rr">
+              <span id="dash-rr-press" class="wheel-press">0.00</span>
+              <span id="dash-rr-temp" class="wheel-temp">0°C</span>
+            </div>
+          </div>
+          <div id="dash-brakes" class="tyres-sub">0 FREINS</div>
+        </div>
+      </div>
+
+      <!-- 3. Footer Telemetry Bar -->
+      <div id="dash-footer" class="footer_telemetry_bar">
+        FUEL: 0.0L (0 laps) | TC: 0 | ABS: 0 | BIAS: 0.0% | MAP: 0 | TEMP: H:0°C O:0°C
+      </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let socket = null;
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+
+    function connect() {
+      const host = location.host || '127.0.0.1:5000';
+      socket = new WebSocket(`ws://${host}`);
+      socket.onopen = () => { dot.classList.add('connected'); text.textContent = 'Connecté'; };
+      socket.onclose = () => { dot.classList.remove('connected'); text.textContent = 'Déconnecté'; setTimeout(connect, 1500); };
+      socket.onerror = () => { socket.close(); };
+    }
+
+    function triggerHaptic(duration = 25) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(duration); } catch(e) {}
+      }
+    }
+
+    function sendPayload(action, type) {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ action, type }));
+      }
+    }
+
+    // Gestion des Onglets & Immersion Plein Écran
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === tabId));
+      if (tabId === 'tab-dashboard') {
+        document.body.classList.add('dash-active');
+      } else {
+        document.body.classList.remove('dash-active');
+      }
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        triggerHaptic(20);
+        switchTab(btn.dataset.tab);
+      });
+    });
+
+    const btnDashExit = document.getElementById('btn-dash-exit');
+    if (btnDashExit) {
+      btnDashExit.addEventListener('click', (e) => {
+        e.preventDefault();
+        triggerHaptic(20);
+        switchTab('tab-course');
+      });
+    }
+
+    // Contrôles TAP (Course)
+    function bindTapButton(id, action) {
+      const btn = document.getElementById(id);
+      if (btn) {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          triggerHaptic(25);
+          sendPayload(action, 'tap');
+        });
+      }
+    }
+
+    bindTapButton('btn-drs', 'drs');
+    bindTapButton('btn-bias-inc', 'brake_bias_inc');
+    bindTapButton('btn-bias-dec', 'brake_bias_dec');
+    bindTapButton('btn-tc-inc', 'tc_inc');
+    bindTapButton('btn-tc-dec', 'tc_dec');
+    bindTapButton('btn-eb-inc', 'eb_inc');
+    bindTapButton('btn-eb-dec', 'eb_dec');
+    bindTapButton('btn-abs-inc', 'abs_inc');
+    bindTapButton('btn-abs-dec', 'abs_dec');
+    bindTapButton('btn-headlights-toggle', 'headlights_toggle');
+    bindTapButton('btn-headlights-flash', 'headlights_flash');
+    bindTapButton('btn-wipers-cycle', 'wipers_cycle');
+    bindTapButton('btn-pit-limiter', 'pit_limiter');
+
+    // Contrôles HOLD (Cockpit)
+    function bindHoldButton(id, action) {
+      const btn = document.getElementById(id);
+      let isHolding = false;
+
+      const startHold = (e) => {
+        e.preventDefault();
+        if (!isHolding) {
+          isHolding = true;
+          btn.classList.add('active');
+          triggerHaptic(35);
+          sendPayload(action, 'hold_start');
+        }
+      };
+
+      const stopHold = (e) => {
+        e.preventDefault();
+        if (isHolding) {
+          isHolding = false;
+          btn.classList.remove('active');
+          triggerHaptic(15);
+          sendPayload(action, 'hold_stop');
+        }
+      };
+
+      btn.addEventListener('mousedown', startHold);
+      btn.addEventListener('touchstart', startHold);
+      btn.addEventListener('mouseup', stopHold);
+      btn.addEventListener('mouseleave', stopHold);
+      btn.addEventListener('touchend', stopHold);
+      btn.addEventListener('touchcancel', stopHold);
+    }
+
+    bindHoldButton('btn-seat-up', 'seat_up');
+    bindHoldButton('btn-seat-down', 'seat_down');
+    bindHoldButton('btn-seat-forward', 'seat_forward');
+    bindHoldButton('btn-seat-backward', 'seat_backward');
+    bindHoldButton('btn-pitch-up', 'pitch_up');
+    bindHoldButton('btn-pitch-down', 'pitch_down');
+    bindHoldButton('btn-yaw-left', 'yaw_left');
+    bindHoldButton('btn-yaw-right', 'yaw_right');
+    bindHoldButton('btn-fov-inc', 'fov_inc');
+    bindHoldButton('btn-fov-dec', 'fov_dec');
+
+    // Gestion du tiroir de mapping (Drawer)
+    const drawer = document.getElementById('mapping-drawer');
+    const overlay = document.getElementById('drawer-overlay');
+    const btnHamburger = document.getElementById('btn-hamburger');
+    const btnCloseDrawer = document.getElementById('btn-close-drawer');
+
+    function openDrawer(e) {
+      if (e) e.preventDefault();
+      triggerHaptic(20);
+      if (drawer) drawer.classList.add('active');
+      if (overlay) overlay.classList.add('active');
+    }
+
+    function closeDrawer(e) {
+      if (e) e.preventDefault();
+      triggerHaptic(15);
+      if (drawer) drawer.classList.remove('active');
+      if (overlay) overlay.classList.remove('active');
+    }
+
+    if (btnHamburger) btnHamburger.addEventListener('click', openDrawer);
+    if (btnCloseDrawer) btnCloseDrawer.addEventListener('click', closeDrawer);
+    if (overlay) overlay.addEventListener('click', closeDrawer);
+
+    // Plein Écran (Fullscreen)
+    function toggleFullscreen() {
+      triggerHaptic(30);
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    if (btnFullscreen) {
+      btnFullscreen.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleFullscreen();
+      });
+    }
+
+    const btnDashFullscreen = document.getElementById('btn-dash-fullscreen');
+    if (btnDashFullscreen) {
+      btnDashFullscreen.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleFullscreen();
+      });
+    }
+
+    // Télémétrie Assetto Corsa SSE (/telemetry)
+    function updateDashboardTelemetry(data) {
+      if (!data) return;
+      const elGear = document.getElementById('dash-gear');
+      const elSpeed = document.getElementById('dash-speed');
+      const elLapTime = document.getElementById('dash-lap-time');
+      const elDelta = document.getElementById('dash-delta');
+      const elLap = document.getElementById('dash-lap');
+      const elPos = document.getElementById('dash-pos');
+      const elFooter = document.getElementById('dash-footer');
+      const leds = document.querySelectorAll('.shift_lights .led');
+
+      if (!data.connected) {
+        if (elGear) elGear.textContent = '0';
+        if (elSpeed) elSpeed.textContent = '0';
+        if (elLapTime) elLapTime.textContent = '0:00.00';
+        if (elDelta) { elDelta.textContent = '0.00'; elDelta.style.color = '#888888'; }
+        if (elLap) elLap.textContent = 'LAP 0/0';
+        if (elPos) elPos.textContent = 'P0';
+        if (elFooter) elFooter.textContent = 'FUEL: 0.0L (0 laps) | TC: 0 | ABS: 0 | BIAS: 0.0% | MAP: 0 | TEMP: H:0°C O:0°C';
+
+        leds.forEach(led => led.classList.remove('active-green', 'active-red', 'active-blue'));
+
+        ['fl', 'fr', 'rl', 'rr'].forEach(w => {
+          const p = document.getElementById(`dash-${w}-press`);
+          const t = document.getElementById(`dash-${w}-temp`);
+          const badge = document.getElementById(`dash-wheel-${w}`);
+          if (p) p.textContent = '0.00';
+          if (t) t.textContent = '0°C';
+          if (badge) badge.classList.remove('opt', 'hot');
+        });
+        return;
+      }
+
+      // Valeurs dynamiques en session de jeu
+      if (elGear) elGear.textContent = data.gearStr || String(data.gear || '0');
+      if (elSpeed) elSpeed.textContent = Math.round(data.speedKmh || 0);
+      if (elLapTime) elLapTime.textContent = data.currentTime || '0:00.00';
+      if (elLap) elLap.textContent = `LAP ${data.completedLaps || 0}/${data.numberOfLaps || 0}`;
+      if (elPos) elPos.textContent = `P${data.position || 0}`;
+
+      if (elDelta && data.delta !== undefined) {
+        const deltaVal = parseFloat(data.delta) || 0;
+        elDelta.textContent = (deltaVal > 0 ? '+' : '') + deltaVal.toFixed(2);
+        elDelta.style.color = deltaVal < 0 ? '#00e676' : (deltaVal > 0 ? '#ff1744' : '#888888');
+      }
+
+      // Illumination dynamique des 16 LEDs selon rpms / maxRpm
+      const maxRpm = data.maxRpm || 8000;
+      const ratio = maxRpm > 0 ? (data.rpms / maxRpm) : 0;
+      let litCount = 0;
+      if (ratio > 0.60) {
+        litCount = Math.min(16, Math.max(1, Math.round(((ratio - 0.60) / 0.40) * 16)));
+      }
+      leds.forEach((led, idx) => {
+        led.classList.remove('active-green', 'active-red', 'active-blue');
+        if (idx < litCount) {
+          if (idx < 5) led.classList.add('active-green');
+          else if (idx < 12) led.classList.add('active-red');
+          else led.classList.add('active-blue');
+        }
+      });
+
+      // Pression et température des 4 pneumatiques
+      if (Array.isArray(data.wheelsPressure) && Array.isArray(data.tyreCoreTemperature)) {
+        const wheels = ['fl', 'fr', 'rl', 'rr'];
+        wheels.forEach((w, idx) => {
+          const press = data.wheelsPressure[idx];
+          const temp = data.tyreCoreTemperature[idx];
+          const elP = document.getElementById(`dash-${w}-press`);
+          const elT = document.getElementById(`dash-${w}-temp`);
+          const badge = document.getElementById(`dash-wheel-${w}`);
+          if (elP && press !== undefined) elP.textContent = press.toFixed(2);
+          if (elT && temp !== undefined) elT.textContent = `${Math.round(temp)}°C`;
+          if (badge && temp !== undefined) {
+            badge.classList.remove('opt', 'hot');
+            if (temp > 95) badge.classList.add('hot');
+            else if (temp >= 70) badge.classList.add('opt');
+          }
+        });
+      }
+
+      // Bandeau inférieur
+      if (elFooter) {
+        const fuel = (data.fuel || 0).toFixed(1);
+        const bias = (data.brakeBias || 0).toFixed(1);
+        const road = Math.round(data.roadTemp || 0);
+        const air = Math.round(data.airTemp || 0);
+        elFooter.textContent = `FUEL: ${fuel}L | TC: ${data.tc || 0} | ABS: ${data.abs || 0} | BIAS: ${bias}% | MAP: ${data.engineMap || 0} | TEMP: H:${road}°C O:${air}°C`;
+      }
+    }
+
+    function initTelemetrySSE() {
+      const eventSource = new EventSource('/telemetry');
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          updateDashboardTelemetry(data);
+        } catch (e) {}
+      };
+      eventSource.onerror = () => {
+        // Reconnexion automatique assurée par le navigateur
+      };
+    }
+
+    connect();
+    initTelemetrySSE();
+  </script>
+</body>
+</html>

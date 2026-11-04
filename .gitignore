@@ -1,0 +1,34 @@
+# Instructions & gouvernance agents (agents IA internes)
+.agents/
+
+# Environnements virtuels Python
+.venv/
+env/
+venv/
+ENV/
+
+# Caches Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Fichiers temporaires de compilation & PyInstaller
+build/
+dist/
+*.spec
+
+# Logs & fichiers d'exécution locale
+*.log
+
+# Fichiers système & IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Optionnel : binaires volumineux (à activer si distribués via les Releases GitHub)
+# release/*.exe
