@@ -5,18 +5,27 @@ import threading
 import time
 
 if getattr(sys, "frozen", False):
-    BASE_DIR = sys._MEIPASS
+    BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
-sim_box_dir = os.path.join(BASE_DIR, "sim_box_bridge")
-if os.path.exists(sim_box_dir) and sim_box_dir not in sys.path:
-    sys.path.insert(0, sim_box_dir)
+# Assure la présence des dossiers critiques dans sys.path (pour exécution standalone et source)
+for p in (
+    BASE_DIR,
+    os.path.join(BASE_DIR, "sim_box_bridge"),
+    os.path.dirname(BASE_DIR),
+    os.path.join(os.path.dirname(BASE_DIR), "sim_box_bridge"),
+):
+    if p and os.path.exists(p) and p not in sys.path:
+        sys.path.insert(0, p)
 
-import bridge
-import watcher
+try:
+    import bridge
+    import watcher
+except ImportError:
+    from sim_box_bridge import bridge
+    from sim_box_bridge import watcher
+
 
 def run_watcher():
     time.sleep(1.0)
@@ -42,6 +51,7 @@ def run_watcher():
         except Exception:
             time.sleep(2.0)
 
+
 def main():
     print("=======================================================", flush=True)
     print("      Sim Racing Button Box Bridge - Standalone        ", flush=True)
@@ -54,6 +64,7 @@ def main():
         asyncio.run(bridge.main())
     except KeyboardInterrupt:
         print("[MAIN] Fermeture propre.", flush=True)
+
 
 if __name__ == "__main__":
     main()

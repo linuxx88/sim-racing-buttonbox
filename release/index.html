@@ -466,6 +466,134 @@
       font-weight: bold;
       color: #2ecc71;
     }
+  
+    /* Heatmap Thermique 3 Zones Pneus (Int / Mid / Out) */
+    .wheel-thermal-strip {
+      display: flex;
+      gap: 1.5px;
+      width: 100%;
+      height: 3.5px;
+      margin-top: 2px;
+      border-radius: 2px;
+      overflow: hidden;
+      background: #111;
+    }
+    .thermal-bar {
+      flex: 1;
+      height: 100%;
+      background: #282828;
+      transition: background-color 0.25s ease;
+    }
+
+    /* Disques de frein incandescents SVG */
+    .svg-brake-disc {
+      transition: fill 0.3s ease, filter 0.3s ease;
+    }
+
+    /* Badge Simulateur Actif */
+    .dash-sim-badge {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #151515;
+      border: 1px solid #333333;
+      color: #777777;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .dash-sim-badge.active-ams2 {
+      background: rgba(0, 230, 118, 0.12);
+      border-color: #00e676;
+      color: #00e676;
+    }
+    .dash-sim-badge.active-ac {
+      background: rgba(41, 121, 255, 0.12);
+      border-color: #2979ff;
+      color: #2979ff;
+    }
+
+    /* Sélecteur de Profils Véhicules (GT3 / F1 / HYPERCAR) */
+    .dash-profile-selector {
+      display: flex;
+      gap: 4px;
+    }
+    .dash-pill-btn {
+      background: #151515;
+      border: 1px solid #2a2a2a;
+      color: #777777;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .dash-pill-btn.active {
+      background: #2a2a2a;
+      border-color: #00e676;
+      color: #ffffff;
+    }
+
+    /* DRS & ERS (Profil F1 / Hypercar) */
+    .dash-drs-badge {
+      font-size: 10px;
+      font-weight: 900;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid #2a2a2a;
+      color: #444444;
+      background: #111111;
+      letter-spacing: 0.5px;
+    }
+    .dash-drs-badge.avail {
+      border-color: #00e676;
+      color: #00e676;
+      background: rgba(0, 230, 118, 0.15);
+    }
+    .dash-drs-badge.active {
+      border-color: #d500f9;
+      color: #ffffff;
+      background: #d500f9;
+      box-shadow: 0 0 10px #d500f9;
+    }
+    .dash-ers-container {
+      display: none;
+      width: 100%;
+      margin-top: 4px;
+    }
+    .dash-ers-bar-bg {
+      width: 100%;
+      height: 5px;
+      background: #161616;
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid #2a2a2a;
+    }
+    .dash-ers-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: #00e5ff;
+      transition: width 0.2s ease;
+    }
+
+    /* Informations Voiture & Circuit */
+    .dash-car-info {
+      font-size: 9px;
+      color: #666666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 160px;
+      margin-top: 2px;
+    }
+    .dash-hint-ams2 {
+      font-size: 8px;
+      color: #555555;
+      text-align: center;
+      margin-top: 2px;
+    }
+
   </style>
 </head>
 <body>
@@ -677,10 +805,17 @@
 
     <!-- Onglet Dashboard GT3 Telemetry -->
     <div id="tab-dashboard" class="tab-panel">
-      <!-- Boutons Contrôle Flottants Discrets -->
+      <!-- Boutons Contrôle Flottants Discrets & Sélecteur Profil -->
       <div class="dash-controls-floating">
         <button id="btn-dash-exit" class="dash-icon-btn" aria-label="Quitter le Dashboard">✕</button>
         <button id="btn-dash-fullscreen" class="dash-icon-btn" aria-label="Plein Écran">⛶</button>
+        <span id="dash-sim-badge" class="dash-sim-badge">EN ATTENTE</span>
+        <div class="dash-profile-selector">
+          <button class="dash-pill-btn active" data-profile="gt3">GT3</button>
+          <button class="dash-pill-btn" data-profile="f1">F1</button>
+          <button class="dash-pill-btn" data-profile="hypercar">HYPERCAR</button>
+        </div>
+        <span id="dash-drs" class="dash-drs-badge">DRS</span>
       </div>
 
       <!-- 1. Shift Lights (16 LEDs) -->
@@ -721,6 +856,11 @@
               <div id="dash-pos" class="pos-val">P0</div>
             </div>
           </div>
+          <div id="dash-car-info" class="dash-car-info">--</div>
+          <div id="dash-ers-widget" class="dash-ers-container">
+            <div class="dash-label" style="font-size: 8px;">ERS BATTERIE</div>
+            <div class="dash-ers-bar-bg"><div id="dash-ers-fill" class="dash-ers-bar-fill"></div></div>
+          </div>
         </div>
 
         <!-- Colonne Centre -->
@@ -743,22 +883,47 @@
               <line x1="8" y1="122" x2="62" y2="122" stroke="#2a2a2a" stroke-width="3" stroke-linecap="round" />
               <line x1="22" y1="118" x2="22" y2="122" stroke="#2a2a2a" stroke-width="1.5" />
               <line x1="48" y1="118" x2="48" y2="122" stroke="#2a2a2a" stroke-width="1.5" />
+              <!-- Disques de freins avec effet thermique dynamique -->
+              <rect id="svg-brake-fl" class="svg-brake-disc" x="12" y="18" width="4" height="14" rx="2" fill="#2a2a2a" />
+              <rect id="svg-brake-fr" class="svg-brake-disc" x="54" y="18" width="4" height="14" rx="2" fill="#2a2a2a" />
+              <rect id="svg-brake-rl" class="svg-brake-disc" x="12" y="96" width="4" height="14" rx="2" fill="#2a2a2a" />
+              <rect id="svg-brake-rr" class="svg-brake-disc" x="54" y="96" width="4" height="14" rx="2" fill="#2a2a2a" />
             </svg>
             <div id="dash-wheel-fl" class="wheel-badge wheel-fl">
               <span id="dash-fl-press" class="wheel-press">0.00</span>
               <span id="dash-fl-temp" class="wheel-temp">0°C</span>
+              <div class="wheel-thermal-strip">
+                <span id="dash-fl-tin" class="thermal-bar" title="Intérieur"></span>
+                <span id="dash-fl-tmid" class="thermal-bar" title="Milieu"></span>
+                <span id="dash-fl-tout" class="thermal-bar" title="Extérieur"></span>
+              </div>
             </div>
             <div id="dash-wheel-fr" class="wheel-badge wheel-fr">
               <span id="dash-fr-press" class="wheel-press">0.00</span>
               <span id="dash-fr-temp" class="wheel-temp">0°C</span>
+              <div class="wheel-thermal-strip">
+                <span id="dash-fr-tin" class="thermal-bar" title="Intérieur"></span>
+                <span id="dash-fr-tmid" class="thermal-bar" title="Milieu"></span>
+                <span id="dash-fr-tout" class="thermal-bar" title="Extérieur"></span>
+              </div>
             </div>
             <div id="dash-wheel-rl" class="wheel-badge wheel-rl">
               <span id="dash-rl-press" class="wheel-press">0.00</span>
               <span id="dash-rl-temp" class="wheel-temp">0°C</span>
+              <div class="wheel-thermal-strip">
+                <span id="dash-rl-tin" class="thermal-bar" title="Intérieur"></span>
+                <span id="dash-rl-tmid" class="thermal-bar" title="Milieu"></span>
+                <span id="dash-rl-tout" class="thermal-bar" title="Extérieur"></span>
+              </div>
             </div>
             <div id="dash-wheel-rr" class="wheel-badge wheel-rr">
               <span id="dash-rr-press" class="wheel-press">0.00</span>
               <span id="dash-rr-temp" class="wheel-temp">0°C</span>
+              <div class="wheel-thermal-strip">
+                <span id="dash-rr-tin" class="thermal-bar" title="Intérieur"></span>
+                <span id="dash-rr-tmid" class="thermal-bar" title="Milieu"></span>
+                <span id="dash-rr-tout" class="thermal-bar" title="Extérieur"></span>
+              </div>
             </div>
           </div>
           <div id="dash-brakes" class="tyres-sub">0 FREINS</div>
@@ -946,7 +1111,51 @@
       });
     }
 
-    // Télémétrie Assetto Corsa SSE (/telemetry)
+    // Profils Véhicules Actifs
+    let currentProfile = 'gt3';
+    document.querySelectorAll('.dash-pill-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.querySelectorAll('.dash-pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentProfile = btn.dataset.profile;
+        const ersWidget = document.getElementById('dash-ers-widget');
+        if (ersWidget) {
+          ersWidget.style.display = (currentProfile === 'f1' || currentProfile === 'hypercar') ? 'block' : 'none';
+        }
+      });
+    });
+
+    // Échelle de couleur thermique pneus
+    function getThermalColor(t) {
+      if (t <= 0) return '#282828';
+      if (t < 70) return '#1e88e5';  // Froid / Bleu
+      if (t < 80) return '#00acc1';  // Montée en t° / Cyan
+      if (t <= 96) return '#00e676'; // Optimum / Vert
+      if (t <= 106) return '#ff9100'; // Chaud / Orange
+      return '#ff1744';              // Surchauffe / Rouge
+    }
+
+    // Incandescence dynamique des disques de freins
+    function updateBrakeDisc(discId, temp) {
+      const el = document.getElementById(discId);
+      if (!el) return;
+      if (temp < 250) {
+        el.setAttribute('fill', '#2a2a2a');
+        el.style.filter = 'none';
+      } else if (temp < 450) {
+        el.setAttribute('fill', '#8d2b0b');
+        el.style.filter = 'drop-shadow(0 0 2px #d84315)';
+      } else if (temp < 650) {
+        el.setAttribute('fill', '#e65100');
+        el.style.filter = 'drop-shadow(0 0 5px #ff5722)';
+      } else {
+        el.setAttribute('fill', '#ff9100');
+        el.style.filter = 'drop-shadow(0 0 8px #ffab00)';
+      }
+    }
+
+    // Télémétrie Multi-Simulateurs SSE (/telemetry)
     function updateDashboardTelemetry(data) {
       if (!data) return;
       const elGear = document.getElementById('dash-gear');
@@ -956,7 +1165,25 @@
       const elLap = document.getElementById('dash-lap');
       const elPos = document.getElementById('dash-pos');
       const elFooter = document.getElementById('dash-footer');
+      const elSimBadge = document.getElementById('dash-sim-badge');
+      const elCarInfo = document.getElementById('dash-car-info');
+      const elDrs = document.getElementById('dash-drs');
+      const elErsFill = document.getElementById('dash-ers-fill');
       const leds = document.querySelectorAll('.shift_lights .led');
+
+      // État de connexion & Badge Simulateur
+      if (elSimBadge) {
+        elSimBadge.classList.remove('active-ams2', 'active-ac');
+        if (data.connected && data.sim === 'AMS2') {
+          elSimBadge.textContent = 'AMS2';
+          elSimBadge.classList.add('active-ams2');
+        } else if (data.connected && data.sim === 'Assetto Corsa') {
+          elSimBadge.textContent = 'AC';
+          elSimBadge.classList.add('active-ac');
+        } else {
+          elSimBadge.textContent = 'EN ATTENTE';
+        }
+      }
 
       if (!data.connected) {
         if (elGear) elGear.textContent = '0';
@@ -965,7 +1192,8 @@
         if (elDelta) { elDelta.textContent = '0.00'; elDelta.style.color = '#888888'; }
         if (elLap) elLap.textContent = 'LAP 0/0';
         if (elPos) elPos.textContent = 'P0';
-        if (elFooter) elFooter.textContent = 'FUEL: 0.0L (0 laps) | TC: 0 | ABS: 0 | BIAS: 0.0% | MAP: 0 | TEMP: H:0°C O:0°C';
+        if (elCarInfo) elCarInfo.textContent = 'Activez Shared Memory dans Options';
+        if (elFooter) elFooter.textContent = 'STANDBY | FUEL: 0.0L | TC: 0 | ABS: 0 | BIAS: 0.0%';
 
         leds.forEach(led => led.classList.remove('active-green', 'active-red', 'active-blue'));
 
@@ -976,25 +1204,58 @@
           if (p) p.textContent = '0.00';
           if (t) t.textContent = '0°C';
           if (badge) badge.classList.remove('opt', 'hot');
+          updateBrakeDisc(`svg-brake-${w}`, 0);
+          ['in', 'mid', 'out'].forEach(pos => {
+            const bar = document.getElementById(`dash-${w}-t${pos}`);
+            if (bar) bar.style.backgroundColor = '#282828';
+          });
         });
         return;
       }
 
-      // Valeurs dynamiques en session de jeu
+      // Valeurs dynamiques en session active
       if (elGear) elGear.textContent = data.gearStr || String(data.gear || '0');
       if (elSpeed) elSpeed.textContent = Math.round(data.speedKmh || 0);
       if (elLapTime) elLapTime.textContent = data.currentTime || '0:00.00';
       if (elLap) elLap.textContent = `LAP ${data.completedLaps || 0}/${data.numberOfLaps || 0}`;
       if (elPos) elPos.textContent = `P${data.position || 0}`;
 
-      if (elDelta && data.delta !== undefined) {
-        const deltaVal = parseFloat(data.delta) || 0;
-        elDelta.textContent = (deltaVal > 0 ? '+' : '') + deltaVal.toFixed(2);
-        elDelta.style.color = deltaVal < 0 ? '#00e676' : (deltaVal > 0 ? '#ff1744' : '#888888');
+      if (elCarInfo) {
+        const c = data.carName ? data.carName : '';
+        const tr = data.trackName ? ` | ${data.trackName}` : '';
+        elCarInfo.textContent = (c + tr) || data.sim;
       }
 
-      // Illumination dynamique des 16 LEDs selon rpms / maxRpm
-      const maxRpm = data.maxRpm || 8000;
+      // DRS & Hybride
+      if (elDrs) {
+        elDrs.classList.remove('avail', 'active');
+        if (data.drs === 2 || data.drs === true) elDrs.classList.add('active');
+        else if (data.drs === 1) elDrs.classList.add('avail');
+      }
+      if (elErsFill) {
+        const soc = data.kersCharge ? Math.round(data.kersCharge * 100) : 85;
+        elErsFill.style.width = `${soc}%`;
+      }
+
+      // Delta dynamique en direct
+      if (elDelta) {
+        let deltaVal = 0.0;
+        if (data.splitTimeAhead !== undefined && data.splitTimeAhead !== 0.0) {
+          deltaVal = data.splitTimeAhead;
+        } else if (data.delta !== undefined) {
+          deltaVal = parseFloat(data.delta) || 0;
+        }
+        if (deltaVal !== 0.0) {
+          elDelta.textContent = (deltaVal > 0 ? '+' : '') + deltaVal.toFixed(2);
+          elDelta.style.color = deltaVal < 0 ? '#00e676' : '#ff1744';
+        } else {
+          elDelta.textContent = '0.00';
+          elDelta.style.color = '#888888';
+        }
+      }
+
+      // Illumination dynamique des 16 LEDs selon régime / maxRpm
+      const maxRpm = data.maxRpm || (currentProfile === 'f1' ? 15000 : 8500);
       const ratio = maxRpm > 0 ? (data.rpms / maxRpm) : 0;
       let litCount = 0;
       if (ratio > 0.60) {
@@ -1009,32 +1270,56 @@
         }
       });
 
-      // Pression et température des 4 pneumatiques
+      // Pression et Heatmap 3 Zones des 4 roues
+      const wheels = ['fl', 'fr', 'rl', 'rr'];
       if (Array.isArray(data.wheelsPressure) && Array.isArray(data.tyreCoreTemperature)) {
-        const wheels = ['fl', 'fr', 'rl', 'rr'];
         wheels.forEach((w, idx) => {
           const press = data.wheelsPressure[idx];
           const temp = data.tyreCoreTemperature[idx];
           const elP = document.getElementById(`dash-${w}-press`);
           const elT = document.getElementById(`dash-${w}-temp`);
           const badge = document.getElementById(`dash-wheel-${w}`);
+
           if (elP && press !== undefined) elP.textContent = press.toFixed(2);
           if (elT && temp !== undefined) elT.textContent = `${Math.round(temp)}°C`;
           if (badge && temp !== undefined) {
             badge.classList.remove('opt', 'hot');
             if (temp > 95) badge.classList.add('hot');
-            else if (temp >= 70) badge.classList.add('opt');
+            else if (temp >= 75) badge.classList.add('opt');
+          }
+
+          // Rendu thermique des 3 zones (Intérieur / Milieu / Extérieur)
+          if (Array.isArray(data.tyreThermal3Zones) && data.tyreThermal3Zones[idx]) {
+            const z = data.tyreThermal3Zones[idx];
+            const barIn = document.getElementById(`dash-${w}-tin`);
+            const barMid = document.getElementById(`dash-${w}-tmid`);
+            const barOut = document.getElementById(`dash-${w}-tout`);
+            if (barIn) barIn.style.backgroundColor = getThermalColor(z.inside);
+            if (barMid) barMid.style.backgroundColor = getThermalColor(z.middle);
+            if (barOut) barOut.style.backgroundColor = getThermalColor(z.outside);
           }
         });
+      }
+
+      // Incandescence dynamique des 4 disques de frein
+      if (Array.isArray(data.brakeTemp)) {
+        wheels.forEach((w, idx) => {
+          updateBrakeDisc(`svg-brake-${w}`, data.brakeTemp[idx]);
+        });
+        const elBrakes = document.getElementById('dash-brakes');
+        if (elBrakes && data.brakeTemp[0] !== undefined) {
+          elBrakes.textContent = `FREINS: ${Math.round(data.brakeTemp[0])}°C | ${Math.round(data.brakeTemp[1])}°C`;
+        }
       }
 
       // Bandeau inférieur
       if (elFooter) {
         const fuel = (data.fuel || 0).toFixed(1);
+        const maxFuel = (data.maxFuel || 100).toFixed(0);
         const bias = (data.brakeBias || 0).toFixed(1);
         const road = Math.round(data.roadTemp || 0);
         const air = Math.round(data.airTemp || 0);
-        elFooter.textContent = `FUEL: ${fuel}L | TC: ${data.tc || 0} | ABS: ${data.abs || 0} | BIAS: ${bias}% | MAP: ${data.engineMap || 0} | TEMP: H:${road}°C O:${air}°C`;
+        elFooter.textContent = `SIM: ${data.sim} | FUEL: ${fuel}/${maxFuel}L | TC: ${data.tc || 0} | ABS: ${data.abs || 0} | BIAS: ${bias}% | TEMP: P:${road}°C A:${air}°C`;
       }
     }
 

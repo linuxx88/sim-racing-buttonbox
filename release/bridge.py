@@ -10,6 +10,10 @@ from websockets.http11 import parse_line, parse_headers, d
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from injector import get_injector, VALID_TYPES
+try:
+    from server import handle_sse_telemetry
+except ImportError:
+    from sim_box_bridge.server import handle_sse_telemetry
 
 HOST = "127.0.0.1"
 PORT = 5000
@@ -57,7 +61,7 @@ def load_html() -> str:
                 pass
     return "<h1>Error loading index.html</h1>"
 
-def process_request(connection, request):
+async def process_request(connection, request):
     if "Upgrade" in request.headers:
         return None
     req_path = request.path.split("?")[0]
@@ -71,6 +75,8 @@ def process_request(connection, request):
             del response.headers["Content-Length"]
             response.headers["Content-Length"] = str(len(content.encode("utf-8")))
         return response
+    if req_path == "/telemetry":
+        return await handle_sse_telemetry(connection, request)
     return None
 
 async def handler(websocket):
@@ -92,6 +98,15 @@ async def handler(websocket):
     except websockets.exceptions.ConnectionClosed:
         pass
 
+from websockets.server import ServerProtocol
+
+_orig_send_response = ServerProtocol.send_response
+def _safe_send_response(self, response):
+    if getattr(self, "eof_sent", False):
+        return
+    return _orig_send_response(self, response)
+ServerProtocol.send_response = _safe_send_response
+
 async def main():
     stop = asyncio.Event()
 
@@ -102,7 +117,7 @@ async def main():
         except (NotImplementedError, AttributeError):
             pass
 
-    async with websockets.serve(handler, HOST, PORT, process_request=process_request):
+    async with websockets.serve(handler, HOST, PORT, process_request=process_request, open_timeout=None):
         print("SERVER_LISTENING_PORT_5000", flush=True)
         await stop.wait()
 
