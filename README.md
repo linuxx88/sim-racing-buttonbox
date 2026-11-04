@@ -7,32 +7,32 @@
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](#)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-Boîte à boutons tactile (Button Box) ultra-faible latence pour smartphone/tablette Android, propulsée par un pont Windows autonome.
+Ultra-low latency touch Button Box and telemetry dashboard for Android smartphones and tablets, powered by a lightweight standalone Windows bridge.
 
-Conçu en priorité pour **Automobilista 2 (AMS2)**, avec support d'**Assetto Corsa**.
-
----
-
-## 🚀 Fonctionnalités Opérationnelles
-
-### 1. Boîte à Boutons Tactile (Course & Cockpit)
-- **Onglet Course** : DRS, Répartition de freinage (Bias +/-), Antipatinage (TC +/-), Frein moteur (+/-), ABS (+/-), Pleins phares / Appel de phares, Essuie-glaces, Limiteur de stands (Pit Limiter).
-- **Onglet Cockpit** : Réglages direct en course de la position du siège (Hauteur, Avance/Recul), inclinaison (Pitch) et Champ de vision (FOV).
-- **Drawer de correspondance** : Volet latéral rétractable (`☰`) listant l'ensemble des raccourcis clavier associés.
-- **Retour haptique & visuel** : Confirmation instantanée à l'appui tactile, gestion des appuis répétés ou maintenus.
-- **Mode Plein Écran PWA** : Raccourci natif pour masquer les barres de navigation du navigateur mobile.
+Designed primarily for **Automobilista 2 (AMS2)**, with full **Assetto Corsa** support.
 
 ---
 
-## 🚧 En Cours de Développement (WIP)
+## 🚀 Operational Features
 
-Le **Dashboard Télémétrique GT3** (compteur, rapport de vitesse, rampe de LED et monitoring des pneus en temps réel) est en cours de développement et de calibration.
-
-👉 Consultez [TODO.md](TODO.md) pour la feuille de route détaillée et l'avancement du moteur de télémétrie (AMS2 & Assetto Corsa).
+### 1. Touch Button Box (Race & Cockpit)
+- **Race Tab**: DRS, Brake Bias (+/-), Traction Control (TC +/-), Engine Brake (+/-), ABS (+/-), Headlights / Flash, Wipers, Pit Limiter.
+- **Cockpit Tab**: On-the-fly in-race seat adjustments (Height, Forward/Backward), Pitch angle, and Field of View (FOV).
+- **Mapping Drawer**: Retractable slide-out drawer (`☰`) listing all assigned keyboard shortcut mappings.
+- **Haptic & Visual Feedback**: Instant touch visual feedback with support for repeated and held taps.
+- **PWA Fullscreen Mode**: Native fullscreen toggle to hide mobile browser URL bars and system navigation.
 
 ---
 
-## 🏗️ Architecture Technique
+## 🚧 Work In Progress (WIP)
+
+The **GT3 Telemetry Dashboard** (digital speedometer, large gear indicator, 16-LED shift light bar, and live tire telemetry) is currently under active development and calibration.
+
+👉 Check [TODO.md](TODO.md) for the detailed roadmap and telemetry engine progress (AMS2 & Assetto Corsa).
+
+---
+
+## 🏗️ Technical Architecture
 
 ```
 ┌───────────────────────────────┐
@@ -40,13 +40,13 @@ Le **Dashboard Télémétrique GT3** (compteur, rapport de vitesse, rampe de LED
 │ (Chrome PWA / Fullscreen Web) │
 └──────────────┬────────────────┘
                │ HTTP (SSE) & WebSocket :5000
-               │ (USB via ADB Tunnel ou WiFi LAN)
+               │ (USB via ADB Tunnel or WiFi LAN)
 ┌──────────────▼────────────────────────────────────────┐
-│               SimBoxBridge (PC Windows)               │
-│  - server.py       : Serveur HTTP statique & SSE      │
-│  - bridge.py       : Hub WebSocket & routage          │
-│  - injector.py     : Injection clavier DirectInput    │
-│  - telemetry_ac.py : Lecteur Shared Memory (mmap)     │
+│               SimBoxBridge (Windows PC)               │
+│  - server.py       : Static HTTP server & SSE stream  │
+│  - bridge.py       : WebSocket hub & message router   │
+│  - injector.py     : DirectInput keystroke injection  │
+│  - telemetry_ac.py : Shared Memory reader (mmap)      │
 └──────────────┬────────────────────────────────────────┘
                │ DirectInput / Win32 API / Shared Memory
 ┌──────────────▼────────────────────────────────────────┐
@@ -56,15 +56,15 @@ Le **Dashboard Télémétrique GT3** (compteur, rapport de vitesse, rampe de LED
 
 ---
 
-## 📦 Installation & Démarrage Rapide
+## 📦 Installation & Quick Start
 
-### Méthode 1 : Binaire Autonome (Recommandé)
-Aucune installation de Python requise sur la machine de jeu.
+### Method 1: Standalone Binary (Recommended)
+No Python installation required on your gaming PC.
 
-1. Téléchargez ou récupérez l'exécutable [release/SimBoxBridge.exe](file:///home/ssr/Desktop/ANDROID%20PROJECT/SIMDASHBOARD/release/SimBoxBridge.exe).
-2. Lancez **`SimBoxBridge.exe`** (clic droit > *Exécuter en tant qu'administrateur* pour garantir l'accès à la mémoire partagée et l'injection d'inputs).
+1. Download or locate the executable at [release/SimBoxBridge.exe](file:///home/ssr/Desktop/ANDROID%20PROJECT/SIMDASHBOARD/release/SimBoxBridge.exe).
+2. Run **`SimBoxBridge.exe`** (right-click > *Run as Administrator* to ensure DirectInput injection and shared memory access).
 
-### Méthode 2 : Depuis les Sources (Python)
+### Method 2: From Source (Python)
 ```bash
 git clone https://github.com/linuxx88/sim-racing-buttonbox.git
 cd sim-racing-buttonbox/sim_box_bridge
@@ -78,82 +78,83 @@ python bridge.py
 
 ---
 
-## 📱 Connexion de l'Appareil Android
+## 📱 Connecting Your Android Device
 
-### Option A : Câble USB via ADB Reverse (Zéro Latence - Recommandé)
-1. Activez le **Débogage USB** sur votre smartphone ou tablette Android.
-2. Reliez l'appareil au PC par câble USB.
-3. Exécutez sur votre PC :
+### Option A: USB Cable via ADB Reverse (Zero Latency - Recommended)
+1. Enable **USB Debugging** in Android Developer Options.
+2. Connect your device to the PC using a USB cable.
+3. Run on your PC:
    ```bash
    adb reverse tcp:5000 tcp:5000
    ```
-4. Ouvrez **Google Chrome** sur Android à l'adresse :
+4. Open **Google Chrome** on Android and navigate to:
    ```
    http://localhost:5000
    ```
 
-#### ⚠️ Première connexion & Autorisation ADB (si l'appareil n'est pas détecté)
-Si la commande échoue ou si le mobile n'est pas reconnu :
-1. **Ouvrir un terminal** : Dans le dossier du projet, ouvrez une invite de commandes (`cmd` ou PowerShell).
-2. **Détecter le mobile** : Tapez la commande suivante :
+#### ⚠️ First Connection & ADB Pairing (If Device Is Not Detected)
+If the reverse command fails or your phone is not recognized:
+1. **Open a terminal**: In the project folder, open a Command Prompt (`cmd`) or PowerShell.
+2. **Scan for devices**: Run:
    ```bash
    adb devices
    ```
-3. **Valider l'invite sur Android** : Un pop-up *"Autoriser le débogage USB ?"* apparaît sur le téléphone. Cochez *"Toujours autoriser sur cet ordinateur"* et appuyez sur **OK**.
-4. **Confirmer l'accès** : Si le terminal indiquait `unauthorized`, réexécutez `adb devices` jusqu'à voir votre appareil avec le statut `device` (autorisé).
-5. **Démarrer le pont** : Lancez ensuite `run.bat` ou `SimBoxBridge.exe`.
+3. **Allow USB Debugging on Android**: A prompt *"Allow USB debugging?"* will appear on your phone screen. Check *"Always allow from this computer"* and tap **OK**.
+4. **Confirm Authorization**: If the terminal showed `unauthorized`, run `adb devices` again until the device status displays `device` (authorized).
+5. **Start Bridge**: Run `run.bat` or `SimBoxBridge.exe`.
 
-### Option B : Connexion Réseau Local (WiFi)
-1. Vérifiez que votre smartphone et votre PC sont sur le même réseau WiFi.
-2. Trouvez l'adresse IP locale de votre PC (`ipconfig` sous Windows, ex: `192.168.1.50`).
-3. Ouvrez le navigateur mobile à l'adresse :
+### Option B: Local Network (WiFi)
+1. Ensure your smartphone and PC are connected to the same local WiFi network.
+2. Find your PC's local IP address (`ipconfig` on Windows, e.g., `192.168.1.50`).
+3. Open your mobile browser and go to:
    ```
    http://192.168.1.50:5000
    ```
 
 ---
 
-## ⚙️ Configuration dans les Simulateurs
+## ⚙️ Simulator Configuration
 
 ### 1. Automobilista 2 (AMS2)
-Dans les options de commandes d'AMS2, associez les touches suivantes (ou adaptez le dictionnaire dans `sim_box_bridge/injector.py`) :
+In the AMS2 control settings, assign the following keys (or customize the mapping dictionary in `sim_box_bridge/injector.py`):
 
-| Fonction | Touche Clavier Injectée |
+| Action | Injected Keystroke |
 | :--- | :--- |
 | **DRS** | `D` |
 | **Brake Bias + / -** | `Ctrl + Up` / `Ctrl + Down` |
 | **Traction Control (TC) + / -** | `T` / `Shift + T` |
 | **Engine Brake + / -** | `E` / `Shift + E` |
 | **ABS + / -** | `A` / `Shift + A` |
-| **Phares / Appel de phares** | `L` / `F` |
-| **Essuie-glaces** | `W` |
-| **Limiteur Stands (Pit Limiter)** | `P` |
-| **Réglages Siège (Haut / Bas / Av / Ar)** | `Home` / `End` / `PageUp` / `PageDown` |
+| **Headlights / High Beam Flash** | `L` / `F` |
+| **Wipers** | `W` |
+| **Pit Limiter** | `P` |
+| **Seat Adjustments (Up / Down / Fwd / Back)** | `Home` / `End` / `PageUp` / `PageDown` |
 | **Pitch & FOV** | `Insert` / `Delete` |
 
 ### 2. Assetto Corsa (AC)
-- Activez la mémoire partagée dans **Content Manager** : *Settings > Custom Shaders Patch > General Patch Settings*.
-- La télémétrie démarre automatiquement dès que vous cliquez sur le volant ("Drive") et que la session passe en piste (`LIVE`).
+- Enable Shared Memory in **Content Manager**: *Settings > Custom Shaders Patch > General Patch Settings*.
+- Telemetry streaming automatically goes live once you click "Drive" and enter the track (`LIVE` session).
 
 ---
 
-## 🛠️ Structure du Projet
+## 🛠️ Project Structure
 
 ```
 ├── release/
-│   └── SimBoxBridge.exe       # Binaire Windows portable autonome
+│   └── SimBoxBridge.exe       # Standalone portable Windows binary
 ├── sim_box_bridge/
-│   ├── bridge.py              # Serveur principal WebSocket & orchestration
-│   ├── server.py              # Serveur HTTP et flux SSE télémétrie (/telemetry)
-│   ├── index.html             # Interface web tactile (Course, Cockpit, Dashboard)
-│   ├── injector.py            # Moteur d'injection de touches DirectInput Windows
-│   ├── telemetry_ac.py        # Connecteur Shared Memory Kunos (ctypes / mmap)
-│   ├── requirements.txt       # Dépendances multiplateforme
-│   └── requirements-win.txt   # Dépendances spécifiques Windows
+│   ├── bridge.py              # Main WebSocket server & input routing
+│   ├── server.py              # Static HTTP server & SSE stream (/telemetry)
+│   ├── index.html             # Touch web UI (Race, Cockpit, Dashboard tabs)
+│   ├── injector.py            # Windows DirectInput keyboard injection engine
+│   ├── telemetry_ac.py        # Kunos Shared Memory reader (ctypes / mmap)
+│   ├── requirements.txt       # Cross-platform dependencies
+│   └── requirements-win.txt   # Windows-specific dependencies
+├── TODO.md                    # Roadmap & pending tasks
 └── README.md
 ```
 
 ---
 
-## 📄 Licence
-Projet distribué sous licence Apache 2.0. Voir [LICENSE](file:///home/ssr/Desktop/ANDROID%20PROJECT/SIMDASHBOARD/LICENSE) pour les termes complets.
+## 📄 License
+Distributed under the Apache License 2.0. See [LICENSE](LICENSE) for full details.

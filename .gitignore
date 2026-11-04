@@ -1,28 +1,28 @@
-# Instructions & gouvernance agents (agents IA internes)
+# Internal Agent Instructions & Governance
 .agents/
 
-# Environnements virtuels Python
+# Python Virtual Environments
 .venv/
 env/
 venv/
 ENV/
 
-# Caches Python & Bytecode
+# Python Bytecode & Cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .pytest_cache/
 
-# Fichiers temporaires de compilation & PyInstaller
+# PyInstaller & Build Artifacts
 build/
 dist/
 *.spec
 
-# Logs & fichiers d'exécution locale
+# Local Logs & Execution Traces
 *.log
 
-# Fichiers système & IDE
+# System & IDE Metadata
 .idea/
 .vscode/
 *.swp
@@ -30,5 +30,5 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Optionnel : binaires volumineux (à activer si distribués via les Releases GitHub)
+# Optional: Large Binaries (uncomment if distributed via GitHub Releases instead)
 # release/*.exe
