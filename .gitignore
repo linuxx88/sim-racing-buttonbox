@@ -19,6 +19,7 @@ build/
 dist/
 *.spec
 *.old.exe
+*.running.exe
 
 # Local Logs & Execution Traces
 *.log

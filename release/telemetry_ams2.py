@@ -1,5 +1,6 @@
 """
 Lecteur de télémétrie mémoire partagée Automobilista 2 ($pcars2$) sous Windows.
+Alignement bit-à-bit 100% conforme à l'en-tête officiel Reiza Studios SharedMemory.h.
 Dédié au Dashboard GT3/Multi-Class et à la Sim Box Bridge.
 """
 
@@ -18,8 +19,10 @@ import time
 from typing import Dict, Any, Optional
 
 # Constantes de dimensionnement de la mémoire partagée AMS2 / PCars2
+SHARED_MEMORY_VERSION = 14
 STRING_LENGTH_MAX = 64
 STORED_PARTICIPANTS_MAX = 64
+TYRE_COMPOUND_NAME_LENGTH_MAX = 40
 TYRE_MAX = 4
 VEC_MAX = 3
 
@@ -59,138 +62,168 @@ class ParticipantInfo(Structure):
 class AMS2SharedMemory(Structure):
     """
     Cartographie complète de la mémoire partagée '$pcars2$' (AMS2 / PCars2).
-    Alignement standard MSVC 4 octets.
+    Alignement standard MSVC 4 octets conforme à SharedMemory.h (20700 octets).
     """
     _pack_ = 4
     _fields_ = [
-        # Version & Construction
-        ("mVersion", c_uint),
-        ("mBuildVersionNumber", c_uint),
-
-        # États du Jeu & Session
-        ("mGameState", c_uint),      # 0=EXITED, 1=FRONT_END, 2=INGAME_PLAYING, 3=PAUSED, etc.
-        ("mSessionState", c_uint),  # 0=INVALID, 1=PRACTICE, 2=TEST, 3=QUALIFY, 4=FORMATION, 5=RACE, etc.
-        ("mRaceState", c_uint),     # 0=INVALID, 1=NOT_STARTED, 2=RACING, 3=FINISHED, etc.
-
-        # Participants
-        ("mViewedParticipantIndex", c_int),
-        ("mNumParticipants", c_int),
-        ("mParticipantInfo", ParticipantInfo * STORED_PARTICIPANTS_MAX),
-
-        # Entrées Pilote Brutes (Unfiltered)
-        ("mUnfilteredThrottle", c_float),
-        ("mUnfilteredBrake", c_float),
-        ("mUnfilteredSteering", c_float),
-        ("mUnfilteredClutch", c_float),
-
-        # Informations Véhicule & Circuit
-        ("mCarName", c_char * STRING_LENGTH_MAX),
-        ("mCarClassName", c_char * STRING_LENGTH_MAX),
-        ("mLapsInEvent", c_uint),
-        ("mTrackLocation", c_char * STRING_LENGTH_MAX),
-        ("mTrackVariation", c_char * STRING_LENGTH_MAX),
-        ("mTrackLength", c_float),
-
-        # Chronométrage & Secteurs
-        ("mNumSectors", c_int),
-        ("mLapInvalidated", c_bool),
-        ("mBestLapTime", c_float),
-        ("mLastLapTime", c_float),
-        ("mCurrentTime", c_float),
-        ("mSplitTimeAhead", c_float),
-        ("mSplitTimeBehind", c_float),
-        ("mSplitTime", c_float),
-        ("mEventTimeRemaining", c_float),
-        ("mPersonalFastestLapTime", c_float),
-        ("mWorldFastestLapTime", c_float),
-        ("mPersonalFastestSector1Time", c_float),
-        ("mPersonalFastestSector2Time", c_float),
-        ("mPersonalFastestSector3Time", c_float),
-        ("mWorldFastestSector1Time", c_float),
-        ("mWorldFastestSector2Time", c_float),
-        ("mWorldFastestSector3Time", c_float),
-
-        # Drapeaux & Arrêts aux stands
-        ("mHighestFlagColour", c_uint),
-        ("mHighestFlagReason", c_uint),
-        ("mPitMode", c_uint),
-        ("mPitSchedule", c_uint),
-
-        # État Moteur & Fluides
-        ("mCarFlags", c_uint),
-        ("mOilTempCelsius", c_float),
-        ("mOilPressureKPa", c_float),
-        ("mWaterTempCelsius", c_float),
-        ("mWaterPressureKPa", c_float),
-        ("mFuelPressureKPa", c_float),
-        ("mFuelLevel", c_float),       # Ratio 0.0 -> 1.0
-        ("mFuelCapacity", c_float),    # Litres
-        ("mSpeed", c_float),           # m/s
-        ("mRpm", c_float),
-        ("mMaxRPM", c_float),
-        ("mGear", c_int),              # -1=R, 0=N, 1..n
-        ("mNumGears", c_int),
-        ("mOdometerKM", c_float),
-        ("mAntiLockActive", c_bool),
-        ("mLastOpponentCollisionIndex", c_int),
-        ("mLastOpponentCollisionMagnitude", c_float),
-        ("mBoostActive", c_bool),
-        ("mBoostAmount", c_float),
-
-        # Vecteurs Mouvement & Dynamique
-        ("mOrientation", c_float * VEC_MAX),
-        ("mLocalVelocity", c_float * VEC_MAX),
-        ("mWorldVelocity", c_float * VEC_MAX),
-        ("mAngularVelocity", c_float * VEC_MAX),
-        ("mLocalAcceleration", c_float * VEC_MAX),
-        ("mWorldAcceleration", c_float * VEC_MAX),
-        ("mExtentsCentre", c_float * VEC_MAX),
-
-        # Roues & Pneus (Physique de base)
-        ("mTyreFlags", c_uint * TYRE_MAX),
-        ("mTerrain", c_uint * TYRE_MAX),
-        ("mTyreY", c_float * TYRE_MAX),
-        ("mTyreRPS", c_float * TYRE_MAX),
-        ("mTyreSlipSpeed", c_float * TYRE_MAX),
-        ("mTyreGrip", c_float * TYRE_MAX),
-        ("mTyreHeightAboveGround", c_float * TYRE_MAX),
-        ("mTyreLateralStiffness", c_float * TYRE_MAX),
-        ("mTyreWear", c_float * TYRE_MAX),                 # Ratio 0.0 -> 1.0
-        ("mBrakeDamage", c_float * TYRE_MAX),
-        ("mSuspensionDamage", c_float * TYRE_MAX),
-        ("mBrakeTempCelsius", c_float * TYRE_MAX),         # °C
-        ("mTyreTemp", c_float * TYRE_MAX),                 # °C
-        ("mTyreLayer", c_float * TYRE_MAX),
-        ("mTyreCarcassTemp", c_float * TYRE_MAX),
-        ("mTyreRimTemp", c_float * TYRE_MAX),
-        ("mTyreInternalAirTemp", c_float * TYRE_MAX),
-        ("mWheelLocalPositionY", c_float * TYRE_MAX),
-        ("mSuspensionTravel", c_float * TYRE_MAX),
-        ("mSuspensionVelocity", c_float * TYRE_MAX),
-        ("mAirPressure", c_float * TYRE_MAX),              # PSI
-
-        # Aérodynamique & Entrées Pilote Étendues
-        ("mEngineSpeed", c_float),
-        ("mEngineTorque", c_float),
-        ("mWings", c_float * 2),
-        ("mHandBrake", c_float),
-
-        # Météo & Environnement
-        ("mAmbientTemperature", c_float),
-        ("mTrackTemperature", c_float),
-        ("mRainDensity", c_float),
-        ("mWindSpeed", c_float),
-        ("mWindDirectionX", c_float),
-        ("mWindDirectionY", c_float),
-        ("mCloudBrightness", c_float),
-
-        # Extensions AMS2 v10+ (Session & Températures 3 zones bande de roulement)
-        ("mSessionDuration", c_float),
-        ("mSessionAdditionalLaps", c_int),
-        ("mTyreTempLeft", c_float * TYRE_MAX),             # °C
-        ("mTyreTempCenter", c_float * TYRE_MAX),           # °C
-        ("mTyreTempRight", c_float * TYRE_MAX),            # °C
-        ("mDrsState", c_uint),
+        ("mVersion", c_uint),  # [ RANGE = 0->... ]
+        ("mBuildVersionNumber", c_uint),  # [ RANGE = 0->... ]   [ UNSET = 0 ]
+        ("mGameState", c_uint),  # [ enum (Type#1) Game state ]
+        ("mSessionState", c_uint),  # [ enum (Type#2) Session state ]
+        ("mRaceState", c_uint),  # [ enum (Type#3) Race State ]
+        ("mViewedParticipantIndex", c_int),  # [ RANGE = 0->STORED_PARTICIPANTS_MAX ]   [ UNSET = -1 ]
+        ("mNumParticipants", c_int),  # [ RANGE = 0->STORED_PARTICIPANTS_MAX ]   [ UNSET = -1 ]
+        ("mParticipantInfo", ParticipantInfo * STORED_PARTICIPANTS_MAX),  # [ struct (Type#13) ParticipantInfo struct ]
+        ("mUnfilteredThrottle", c_float),  # [ RANGE = 0.0f->1.0f ]
+        ("mUnfilteredBrake", c_float),  # [ RANGE = 0.0f->1.0f ]
+        ("mUnfilteredSteering", c_float),  # [ RANGE = -1.0f->1.0f ]
+        ("mUnfilteredClutch", c_float),  # [ RANGE = 0.0f->1.0f ]
+        ("mCarName", c_char * STRING_LENGTH_MAX),  # [ string ]
+        ("mCarClassName", c_char * STRING_LENGTH_MAX),  # [ string ]
+        ("mLapsInEvent", c_uint),  # [ RANGE = 0->... ]   [ UNSET = 0 ]
+        ("mTrackLocation", c_char * STRING_LENGTH_MAX),  # [ string ] - untranslated shortened English name
+        ("mTrackVariation", c_char * STRING_LENGTH_MAX),  # [ string ]- untranslated shortened English variation description
+        ("mTrackLength", c_float),  # [ UNITS = Metres ]   [ RANGE = 0.0f->... ]    [ UNSET = 0.0f ]
+        ("mNumSectors", c_int),  # [ RANGE = 0->... ]   [ UNSET = -1 ]
+        ("mLapInvalidated", c_bool),  # [ UNITS = boolean ]   [ RANGE = false->true ]   [ UNSET = false ]
+        ("mBestLapTime", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mLastLapTime", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = 0.0f ]
+        ("mCurrentTime", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = 0.0f ]
+        ("mSplitTimeAhead", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mSplitTimeBehind", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mSplitTime", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = 0.0f ]
+        ("mEventTimeRemaining", c_float),  # [ UNITS = milli-seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mPersonalFastestLapTime", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mWorldFastestLapTime", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mCurrentSector1Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mCurrentSector2Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mCurrentSector3Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mFastestSector1Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mFastestSector2Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mFastestSector3Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mPersonalFastestSector1Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mPersonalFastestSector2Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mPersonalFastestSector3Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mWorldFastestSector1Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mWorldFastestSector2Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mWorldFastestSector3Time", c_float),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mHighestFlagColour", c_uint),  # [ enum (Type#5) Flag Colour ]
+        ("mHighestFlagReason", c_uint),  # [ enum (Type#6) Flag Reason ]
+        ("mPitMode", c_uint),  # [ enum (Type#7) Pit Mode ]
+        ("mPitSchedule", c_uint),  # [ enum (Type#8) Pit Stop Schedule ]
+        ("mCarFlags", c_uint),  # [ enum (Type#9) Car Flags ]
+        ("mOilTempCelsius", c_float),  # [ UNITS = Celsius ]   [ UNSET = 0.0f ]
+        ("mOilPressureKPa", c_float),  # [ UNITS = Kilopascal ]   [ RANGE = 0.0f->... ]   [ UNSET = 0.0f ]
+        ("mWaterTempCelsius", c_float),  # [ UNITS = Celsius ]   [ UNSET = 0.0f ]
+        ("mWaterPressureKPa", c_float),  # [ UNITS = Kilopascal ]   [ RANGE = 0.0f->... ]   [ UNSET = 0.0f ]
+        ("mFuelPressureKPa", c_float),  # [ UNITS = Kilopascal ]   [ RANGE = 0.0f->... ]   [ UNSET = 0.0f ]
+        ("mFuelLevel", c_float),  # [ RANGE = 0.0f->1.0f ]
+        ("mFuelCapacity", c_float),  # [ UNITS = Liters ]   [ RANGE = 0.0f->1.0f ]   [ UNSET = 0.0f ]
+        ("mSpeed", c_float),  # [ UNITS = Metres per-second ]   [ RANGE = 0.0f->... ]
+        ("mRpm", c_float),  # [ UNITS = Revolutions per minute ]   [ RANGE = 0.0f->... ]   [ UNSET = 0.0f ]
+        ("mMaxRPM", c_float),  # [ UNITS = Revolutions per minute ]   [ RANGE = 0.0f->... ]   [ UNSET = 0.0f ]
+        ("mBrake", c_float),  # [ RANGE = 0.0f->1.0f ]
+        ("mThrottle", c_float),  # [ RANGE = 0.0f->1.0f ]
+        ("mClutch", c_float),  # [ RANGE = 0.0f->1.0f ]
+        ("mSteering", c_float),  # [ RANGE = -1.0f->1.0f ]
+        ("mGear", c_int),  # [ RANGE = -1 (Reverse)  0 (Neutral)  1 (Gear 1)  2 (Gear 2)  etc... ]   [ UNSET = 0 (Neutral) ]
+        ("mNumGears", c_int),  # [ RANGE = 0->... ]   [ UNSET = -1 ]
+        ("mOdometerKM", c_float),  # [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mAntiLockActive", c_bool),  # [ UNITS = boolean ]   [ RANGE = false->true ]   [ UNSET = false ]
+        ("mLastOpponentCollisionIndex", c_int),  # [ RANGE = 0->STORED_PARTICIPANTS_MAX ]   [ UNSET = -1 ]
+        ("mLastOpponentCollisionMagnitude", c_float),  # [ RANGE = 0.0f->... ]
+        ("mBoostActive", c_bool),  # [ UNITS = boolean ]   [ RANGE = false->true ]   [ UNSET = false ]
+        ("mBoostAmount", c_float),  # [ RANGE = 0.0f->100.0f ]
+        ("mOrientation", c_float * VEC_MAX),  # [ UNITS = Euler Angles ]
+        ("mLocalVelocity", c_float * VEC_MAX),  # [ UNITS = Metres per-second ]
+        ("mWorldVelocity", c_float * VEC_MAX),  # [ UNITS = Metres per-second ]
+        ("mAngularVelocity", c_float * VEC_MAX),  # [ UNITS = Radians per-second ]
+        ("mLocalAcceleration", c_float * VEC_MAX),  # [ UNITS = Metres per-second ]
+        ("mWorldAcceleration", c_float * VEC_MAX),  # [ UNITS = Metres per-second ]
+        ("mExtentsCentre", c_float * VEC_MAX),  # [ UNITS = Local Space  X  Y  Z ]
+        ("mTyreFlags", c_uint * TYRE_MAX),  # [ enum (Type#10) Tyre Flags ]
+        ("mTerrain", c_uint * TYRE_MAX),  # [ enum (Type#11) Terrain Materials ]
+        ("mTyreY", c_float * TYRE_MAX),  # [ UNITS = Local Space  Y ]
+        ("mTyreRPS", c_float * TYRE_MAX),  # [ UNITS = Revolutions per second ]
+        ("mTyreSlipSpeed", c_float * TYRE_MAX),  # OBSOLETE, kept for backward compatibility only
+        ("mTyreTemp", c_float * TYRE_MAX),  # [ UNITS = Celsius ]   [ UNSET = 0.0f ]
+        ("mTyreGrip", c_float * TYRE_MAX),  # OBSOLETE, kept for backward compatibility only
+        ("mTyreHeightAboveGround", c_float * TYRE_MAX),  # [ UNITS = Local Space  Y ]
+        ("mTyreLateralStiffness", c_float * TYRE_MAX),  # OBSOLETE, kept for backward compatibility only
+        ("mTyreWear", c_float * TYRE_MAX),  # [ RANGE = 0.0f->1.0f ]
+        ("mBrakeDamage", c_float * TYRE_MAX),  # [ RANGE = 0.0f->1.0f ]
+        ("mSuspensionDamage", c_float * TYRE_MAX),  # [ RANGE = 0.0f->1.0f ]
+        ("mBrakeTempCelsius", c_float * TYRE_MAX),  # [ UNITS = Celsius ]
+        ("mTyreTreadTemp", c_float * TYRE_MAX),  # [ UNITS = Kelvin ]
+        ("mTyreLayerTemp", c_float * TYRE_MAX),  # [ UNITS = Kelvin ]
+        ("mTyreCarcassTemp", c_float * TYRE_MAX),  # [ UNITS = Kelvin ]
+        ("mTyreRimTemp", c_float * TYRE_MAX),  # [ UNITS = Kelvin ]
+        ("mTyreInternalAirTemp", c_float * TYRE_MAX),  # [ UNITS = Kelvin ]
+        ("mCrashState", c_uint),  # [ enum (Type#12) Crash Damage State ]
+        ("mAeroDamage", c_float),  # [ RANGE = 0.0f->1.0f ]
+        ("mEngineDamage", c_float),  # [ RANGE = 0.0f->1.0f ]
+        ("mAmbientTemperature", c_float),  # [ UNITS = Celsius ]   [ UNSET = 25.0f ]
+        ("mTrackTemperature", c_float),  # [ UNITS = Celsius ]   [ UNSET = 30.0f ]
+        ("mRainDensity", c_float),  # [ UNITS = How much rain will fall ]   [ RANGE = 0.0f->1.0f ]
+        ("mWindSpeed", c_float),  # [ RANGE = 0.0f->100.0f ]   [ UNSET = 2.0f ]
+        ("mWindDirectionX", c_float),  # [ UNITS = Normalised Vector X ]
+        ("mWindDirectionY", c_float),  # [ UNITS = Normalised Vector Y ]
+        ("mCloudBrightness", c_float),  # [ RANGE = 0.0f->... ]
+        ("mSequenceNumber", c_uint),  # 0 at the start, incremented at start and end of writing, so odd when Shared Memory is being filled, even when the memory is not being touched
+        ("mWheelLocalPositionY", c_float * TYRE_MAX),  # [ UNITS = Local Space  Y ]
+        ("mSuspensionTravel", c_float * TYRE_MAX),  # [ UNITS = meters ] [ RANGE 0.f =>... ]  [ UNSET =  0.0f ]
+        ("mSuspensionVelocity", c_float * TYRE_MAX),  # [ UNITS = Rate of change of pushrod deflection ] [ RANGE 0.f =>... ]  [ UNSET =  0.0f ]
+        ("mAirPressure", c_float * TYRE_MAX),  # [ UNITS = PSI ]  [ RANGE 0.f =>... ]  [ UNSET =  0.0f ]
+        ("mEngineSpeed", c_float),  # [ UNITS = Rad/s ] [UNSET = 0.f ]
+        ("mEngineTorque", c_float),  # [ UNITS = Newton Meters] [UNSET = 0.f ] [ RANGE = 0.0f->... ]
+        ("mWings", c_float * 2),  # [ RANGE = 0.0f->1.0f ] [UNSET = 0.f ]
+        ("mHandBrake", c_float),  # [ RANGE = 0.0f->1.0f ] [UNSET = 0.f ]
+        ("mCurrentSector1Times", c_float * STORED_PARTICIPANTS_MAX),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mCurrentSector2Times", c_float * STORED_PARTICIPANTS_MAX),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mCurrentSector3Times", c_float * STORED_PARTICIPANTS_MAX),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mFastestSector1Times", c_float * STORED_PARTICIPANTS_MAX),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mFastestSector2Times", c_float * STORED_PARTICIPANTS_MAX),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mFastestSector3Times", c_float * STORED_PARTICIPANTS_MAX),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mFastestLapTimes", c_float * STORED_PARTICIPANTS_MAX),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mLastLapTimes", c_float * STORED_PARTICIPANTS_MAX),  # [ UNITS = seconds ]   [ RANGE = 0.0f->... ]   [ UNSET = -1.0f ]
+        ("mLapsInvalidated", c_bool * STORED_PARTICIPANTS_MAX),  # [ UNITS = boolean for all participants ]   [ RANGE = false->true ]   [ UNSET = false ]
+        ("mRaceStates", c_uint * STORED_PARTICIPANTS_MAX),  # [ enum (Type#3) Race State ]
+        ("mPitModes", c_uint * STORED_PARTICIPANTS_MAX),  # [ enum (Type#7)  Pit Mode ]
+        ("mOrientations", (c_float * VEC_MAX) * STORED_PARTICIPANTS_MAX),  # [ UNITS = Euler Angles ]
+        ("mSpeeds", c_float * STORED_PARTICIPANTS_MAX),  # [ UNITS = Metres per-second ]   [ RANGE = 0.0f->... ]
+        ("mCarNames", (c_char * STRING_LENGTH_MAX) * STORED_PARTICIPANTS_MAX),  # [ string ]
+        ("mCarClassNames", (c_char * STRING_LENGTH_MAX) * STORED_PARTICIPANTS_MAX),  # [ string ]
+        ("mEnforcedPitStopLap", c_int),  # [ UNITS = in which lap there will be a mandatory pitstop] [ RANGE = 0.0f->... ] [ UNSET = -1 ]
+        ("mTranslatedTrackLocation", c_char * STRING_LENGTH_MAX),  # [ string ]
+        ("mTranslatedTrackVariation", c_char * STRING_LENGTH_MAX),  # [ string ]
+        ("mBrakeBias", c_float),  # [ RANGE = 0.0f->1.0f... ]   [ UNSET = -1.0f ]
+        ("mTurboBoostPressure", c_float),  # RANGE = 0.0f->1.0f... ]   [ UNSET = -1.0f ]
+        ("mTyreCompound", (c_char * TYRE_COMPOUND_NAME_LENGTH_MAX) * TYRE_MAX),  # [ strings  ]
+        ("mPitSchedules", c_uint * STORED_PARTICIPANTS_MAX),  # [ enum (Type#7)  Pit Mode ]
+        ("mHighestFlagColours", c_uint * STORED_PARTICIPANTS_MAX),  # [ enum (Type#5) Flag Colour ]
+        ("mHighestFlagReasons", c_uint * STORED_PARTICIPANTS_MAX),  # [ enum (Type#6) Flag Reason ]
+        ("mNationalities", c_uint * STORED_PARTICIPANTS_MAX),  # [ nationality table , SP AND UNSET = 0 ]
+        ("mSnowDensity", c_float),  # [ UNITS = How much snow will fall ]   [ RANGE = 0.0f->1.0f ], this is non zero only in Winter and Snow seasons
+        ("mSessionDuration", c_float),  # [ UNITS = minutes ]   [ UNSET = 0.0f ]  The scheduled session Length (unset means laps race. See mLapsInEvent)
+        ("mSessionAdditionalLaps", c_int),  # The number of additional complete laps lead lap drivers must complete to finish a timed race after the session duration has elapsed.
+        ("mTyreTempLeft", c_float * TYRE_MAX),  # [ UNITS = Celsius ]   [ UNSET = 0.0f ]
+        ("mTyreTempCenter", c_float * TYRE_MAX),  # [ UNITS = Celsius ]   [ UNSET = 0.0f ]
+        ("mTyreTempRight", c_float * TYRE_MAX),  # [ UNITS = Celsius ]   [ UNSET = 0.0f ]
+        ("mDrsState", c_uint),  # [ enum (Type#14) DrsState ]
+        ("mRideHeight", c_float * TYRE_MAX),  # [ UNITS = cm ]
+        ("mJoyPad0", c_uint),  # button mask
+        ("mDPad", c_uint),  # button mask
+        ("mAntiLockSetting", c_int),  # [ UNSET = -1 ] Current ABS garage setting. Valid under player control only.
+        ("mTractionControlSetting", c_int),  # [ UNSET = -1 ] Current ABS garage setting. Valid under player control only.
+        ("mErsDeploymentMode", c_int),  # [ enum (Type#15)  ErsDeploymentMode ]
+        ("mErsAutoModeEnabled", c_bool),  # true if the deployment mode was selected by auto system. Valid only when mErsDeploymentMode > ERS_DEPLOYMENT_MODE_NONE
+        ("mClutchTemp", c_float),  # [ UNITS = Kelvin ] [ UNSET = -273.16 ]
+        ("mClutchWear", c_float),  # [ RANGE = 0.0f->1.0f... ]
+        ("mClutchOverheated", c_bool),  # true if clutch performance is degraded due to overheating
+        ("mClutchSlipping", c_bool),  # true if clutch is slipping (can be induced by overheating or wear)
+        ("mYellowFlagState", c_int),  # [ enum (Type#16) YellowFlagState ]
+        ("mSessionIsPrivate", c_bool),  # true if this is a private session where users cannot see or interact with other drivers (and so would not need positional awareness of them etc)
+        ("mLaunchStage", c_int),  # [ enum (Type#17) LaunchStage
     ]
 
 
@@ -265,8 +298,8 @@ class Automobilista2Reader:
         try:
             shm = AMS2SharedMemory.from_buffer_copy(self.mmap_shm)
 
-            # mGameState : 0=EXITED, 1=FRONT_END (menus), 2=INGAME_PLAYING, 3=PAUSED, 6=REPLAY
-            in_game = (shm.mGameState in (2, 3, 4, 6))
+            # mGameState : 0=EXITED, 1=FRONT_END, 2=INGAME_PLAYING, 3=PAUSED, 4=INMENU, 5=RESTARTING, 6=REPLAY
+            in_game = (shm.mGameState in (2, 3, 4, 5, 6))
             is_paused = (shm.mGameState == 3)
 
             # Si le jeu vient d'être quitté ou réinitialisé
@@ -287,7 +320,6 @@ class Automobilista2Reader:
                     self._last_time = current_time_val
                     self._last_change_ts = now
                 elif (now - self._last_change_ts) > 2.5:
-                    # Plus de mise à jour depuis plus de 2.5s : simulation interrompue
                     self.close()
                     return {"connected": False, "sim": "AMS2", "in_game": False}
 
@@ -302,6 +334,14 @@ class Automobilista2Reader:
             else:
                 gear = 0
                 gear_str = "N"
+
+            # Régimes moteurs (RPM & MaxRPM)
+            rpms = int(shm.mRpm) if shm.mRpm > 0 else 0
+            max_rpm = int(shm.mMaxRPM) if shm.mMaxRPM > 0 else 8500
+
+            # Carburant (mFuelCapacity en litres, mFuelLevel en ratio 0.0->1.0)
+            max_fuel = round(float(shm.mFuelCapacity), 1) if shm.mFuelCapacity > 0 else 100.0
+            fuel_level = round(float(shm.mFuelLevel) * max_fuel, 1) if shm.mFuelLevel > 0 else 0.0
 
             # Pressions pneus (PSI -> bar)
             pressures = [
@@ -348,10 +388,6 @@ class Automobilista2Reader:
                 for w in shm.mTyreWear
             ]
 
-            # Carburant
-            max_fuel = round(float(shm.mFuelCapacity), 1) if shm.mFuelCapacity > 0 else 100.0
-            fuel_level = round(float(shm.mFuelLevel) * max_fuel, 1)
-
             # Chronométrage
             current_time_sec = float(shm.mCurrentTime)
             best_lap_sec = float(shm.mBestLapTime)
@@ -359,6 +395,7 @@ class Automobilista2Reader:
 
             split_ahead = round(float(shm.mSplitTimeAhead), 3) if shm.mSplitTimeAhead != -1.0 else 0.0
             split_behind = round(float(shm.mSplitTimeBehind), 3) if shm.mSplitTimeBehind != -1.0 else 0.0
+            split_delta = round(float(shm.mSplitTime), 2) if shm.mSplitTime != 0.0 else 0.0
 
             car_name = shm.mCarName.decode("utf-8", errors="ignore").strip("\x00").strip()
             track_location = shm.mTrackLocation.decode("utf-8", errors="ignore").strip("\x00").strip()
@@ -372,7 +409,42 @@ class Automobilista2Reader:
                     completed_laps = int(p_info.mLapsCompleted)
                     position = int(p_info.mRacePosition)
 
-            max_rpm = int(shm.mMaxRPM) if shm.mMaxRPM > 0 else 8500
+            # DRS : 2 = actif, 1 = disponible, 0 = inactif
+            drs_state = int(shm.mDrsState)
+            if drs_state & (1 << 4):
+                drs_val = 2
+            elif drs_state & ((1 << 2) | (1 << 3)):
+                drs_val = 1
+            else:
+                drs_val = 0
+
+            # Répartition de freinage (Brake Bias %)
+            raw_bias = float(shm.mBrakeBias)
+            if raw_bias > 0:
+                brake_bias = round(raw_bias * 100.0 if raw_bias <= 1.0 else raw_bias, 1)
+            else:
+                brake_bias = 0.0
+
+            # Réglages d'aides ABS & TC
+            if shm.mAntiLockSetting >= 0:
+                abs_val = int(shm.mAntiLockSetting)
+            elif shm.mAntiLockActive or (shm.mCarFlags & 0x10):
+                abs_val = 1
+            else:
+                abs_val = 0
+
+            if shm.mTractionControlSetting >= 0:
+                tc_val = int(shm.mTractionControlSetting)
+            elif shm.mCarFlags & 0x40:
+                tc_val = 1
+            else:
+                tc_val = 0
+
+            # Pédales et direction (filtrées avec fallback non-filtrées)
+            throttle = round(float(shm.mThrottle), 3) if shm.mThrottle > 0 else round(float(shm.mUnfilteredThrottle), 3)
+            brake = round(float(shm.mBrake), 3) if shm.mBrake > 0 else round(float(shm.mUnfilteredBrake), 3)
+            clutch = round(float(shm.mClutch), 3) if shm.mClutch > 0 else round(float(shm.mUnfilteredClutch), 3)
+            steering = round(float(shm.mSteering), 3) if abs(shm.mSteering) > 0.001 else round(float(shm.mUnfilteredSteering), 3)
 
             return {
                 "connected": True,
@@ -383,7 +455,7 @@ class Automobilista2Reader:
                 "speedKmh": speed_kmh,
                 "gear": gear,
                 "gearStr": gear_str,
-                "rpms": int(shm.mRpm) if shm.mRpm > 0 else 0,
+                "rpms": rpms,
                 "maxRpm": max_rpm,
                 "fuel": fuel_level,
                 "maxFuel": max_fuel,
@@ -392,6 +464,7 @@ class Automobilista2Reader:
                 "tyreThermal3Zones": tyre_thermal_3zones,
                 "tyreWear": tyre_wear,
                 "brakeTemp": brakes,
+                "brakeBias": brake_bias,
                 "airTemp": round(float(shm.mAmbientTemperature), 1),
                 "roadTemp": round(float(shm.mTrackTemperature), 1),
                 "currentTime": format_lap_time(current_time_sec),
@@ -399,16 +472,17 @@ class Automobilista2Reader:
                 "lastLapTime": format_lap_time(last_lap_sec),
                 "splitTimeAhead": split_ahead,
                 "splitTimeBehind": split_behind,
+                "delta": split_delta,
                 "completedLaps": completed_laps,
                 "numberOfLaps": int(shm.mLapsInEvent),
                 "position": position,
-                "abs": 1 if shm.mAntiLockActive else 0,
-                "tc": 0,
-                "drs": int(shm.mDrsState),
-                "throttle": round(float(shm.mUnfilteredThrottle), 3) if shm.mUnfilteredThrottle > 0 else 0.0,
-                "brake": round(float(shm.mUnfilteredBrake), 3) if shm.mUnfilteredBrake > 0 else 0.0,
-                "clutch": round(float(shm.mUnfilteredClutch), 3) if shm.mUnfilteredClutch > 0 else 0.0,
-                "steering": round(float(shm.mUnfilteredSteering), 3),
+                "abs": abs_val,
+                "tc": tc_val,
+                "drs": drs_val,
+                "throttle": max(0.0, throttle),
+                "brake": max(0.0, brake),
+                "clutch": max(0.0, clutch),
+                "steering": steering,
                 "carName": car_name,
                 "trackName": track_location,
             }

@@ -68,6 +68,9 @@ class MockAMS2Producer:
         shm.mMaxRPM = 8800.0
         shm.mFuelCapacity = 110.0
         shm.mFuelLevel = 0.55
+        shm.mBrakeBias = 0.54
+        shm.mAntiLockSetting = 2
+        shm.mTractionControlSetting = 3
 
         shm.mBestLapTime = 138.450
         shm.mLastLapTime = 139.120

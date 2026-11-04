@@ -110,6 +110,8 @@ class TelemetryManager:
             "tyreThermal3ZonesList": tyre_thermal_list,
             "tyreWear": list(raw.get("tyreWear", [100.0, 100.0, 100.0, 100.0])),
             "brakeTemp": list(raw.get("brakeTemp", [0.0, 0.0, 0.0, 0.0])),
+            "brakeBias": float(raw.get("brakeBias", 0.0)),
+            "brake_bias": float(raw.get("brakeBias", 0.0)),
             "airTemp": float(raw.get("airTemp", 20.0)),
             "roadTemp": float(raw.get("roadTemp", 25.0)),
             # Chronométrage
@@ -118,6 +120,7 @@ class TelemetryManager:
             "lastLapTime": str(raw.get("lastLapTime", "--:--.---")),
             "splitTimeAhead": split_ahead,
             "splitTimeBehind": float(raw.get("splitTimeBehind", 0.0)),
+            "delta": float(raw.get("delta", 0.0)),
             "delta_lap": split_ahead,
             "completedLaps": int(raw.get("completedLaps", 0)),
             "numberOfLaps": int(raw.get("numberOfLaps", 0)),
@@ -126,6 +129,10 @@ class TelemetryManager:
             "tc": int(raw.get("tc", 0)),
             "drs": drs,
             "drs_status": drs,
+            "throttle": float(raw.get("throttle", 0.0)),
+            "brake": float(raw.get("brake", 0.0)),
+            "clutch": float(raw.get("clutch", 0.0)),
+            "steering": float(raw.get("steering", 0.0)),
             "carName": str(raw.get("carName", "")),
             "trackName": str(raw.get("trackName", "")),
         }
