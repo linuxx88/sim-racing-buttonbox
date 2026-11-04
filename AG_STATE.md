@@ -4,6 +4,21 @@
 - Finalisation d'une Button Box tactile Android ultra-faible latence et d'un Dashboard télémétrique multi-catégorie temps réel (30 Hz SSE) pour simulateurs de course PC (priorité **Automobilista 2 (AMS2)** via `$pcars2$`, support secondaire **Assetto Corsa** via `acpmf`), pilotés par un pont Windows autonome (`SimBoxBridge.exe`).
 
 ## 2. Complété et Validé Aujourd'hui
+- **Résolution du Bug des Diodes RPM Inversées et du Numéro Rapport Erroné (11635573)** :
+  - **Cause racine identifiée** : Extraction de l'en-tête C++ officiel d'Automobilista 2 (`G:\new folder\steamapps\common\Automobilista 2\Support\SharedMemory\AMS2_SharedMemoryExampleApp\SharedMemory.h`). L'ancienne cartographie Python omettait 6 variables de secteur (24 octets) et 4 variables de pédales/direction (16 octets), décalant les offsets mémoire :
+    - `mRpm` lisait en réalité `mWaterTempCelsius` (~90°C).
+    - `mMaxRPM` lisait en réalité `mWaterPressureKPa` (~120-150 kPa).
+    - `mGear` lisait `mFuelPressureKPa` (affichant le nombre géant `11635573`).
+    - Au freinage, la pression d'eau chutait, faisant monter le ratio Temp/Pression au-dessus de 0.60 et allumant les diodes à l'envers !
+  - **Correction intégrale** : Remplacement de `AMS2SharedMemory` par les 158 champs complets et conformes bit-par-bit à `SharedMemory.h` (taille exacte de 20 700 octets validée).
+  - **Nouvelles télémétries actives** :
+    - Répartition de freinage dynamique (`mBrakeBias`) affichée dans le footer (ex: `BIAS: 54.0%`).
+    - Niveaux ABS & TC (`mAntiLockSetting`, `mTractionControlSetting`) transmis au dashboard.
+    - Animation de flash stroboscopique bleu sur les 16 LEDs au rupteur / shift point (`ratio >= 0.97`).
+  - **Recompilation du Binaire Autonome** :
+    - `release/SimBoxBridge.exe` recompilé avec succès via PyInstaller 6.14.1 sous Python 3.12 (14,9 Mo), avec `index.html` embarqué.
+    - Remplacement à chaud sans collision de verrouillage Windows.
+    - Tous les tests d'intégration et E2E SSE validés à 100%.
 - **Lecteur Mémoire Partagée Automobilista 2 (`telemetry_ams2.py`)** :
   - Implémentation complète `ctypes.Structure` de la spécification `$pcars2$` (pack MSVC 4 octets).
   - Validation préalable de l'existence du bloc via `OpenFileMappingW(FILE_MAP_READ, False, "$pcars2$")`.
