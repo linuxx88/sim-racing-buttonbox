@@ -128,10 +128,6 @@ class AMS2SharedMemory(Structure):
         ("mSpeed", c_float),           # m/s
         ("mRpm", c_float),
         ("mMaxRPM", c_float),
-        ("mBrake", c_float),
-        ("mThrottle", c_float),
-        ("mClutch", c_float),
-        ("mSteering", c_float),
         ("mGear", c_int),              # -1=R, 0=N, 1..n
         ("mNumGears", c_int),
         ("mOdometerKM", c_float),
@@ -270,7 +266,7 @@ class Automobilista2Reader:
             shm = AMS2SharedMemory.from_buffer_copy(self.mmap_shm)
 
             # mGameState : 0=EXITED, 1=FRONT_END (menus), 2=INGAME_PLAYING, 3=PAUSED, 6=REPLAY
-            in_game = (shm.mGameState == 2)
+            in_game = (shm.mGameState in (2, 3, 4, 6))
             is_paused = (shm.mGameState == 3)
 
             # Si le jeu vient d'être quitté ou réinitialisé
@@ -298,9 +294,14 @@ class Automobilista2Reader:
             # Conversion de la vitesse m/s -> km/h
             speed_kmh = round(float(shm.mSpeed) * 3.6, 1) if shm.mSpeed > 0 else 0.0
 
-            # Rapport engagé
-            gear = int(shm.mGear)
-            gear_str = GEAR_NAMES.get(gear, str(gear) if gear > 0 else "N")
+            # Rapport engagé sécurisé (-1=R, 0=N, 1..10)
+            raw_gear = int(shm.mGear)
+            if -1 <= raw_gear <= 10:
+                gear = raw_gear
+                gear_str = GEAR_NAMES.get(gear, str(gear))
+            else:
+                gear = 0
+                gear_str = "N"
 
             # Pressions pneus (PSI -> bar)
             pressures = [
@@ -404,6 +405,10 @@ class Automobilista2Reader:
                 "abs": 1 if shm.mAntiLockActive else 0,
                 "tc": 0,
                 "drs": int(shm.mDrsState),
+                "throttle": round(float(shm.mUnfilteredThrottle), 3) if shm.mUnfilteredThrottle > 0 else 0.0,
+                "brake": round(float(shm.mUnfilteredBrake), 3) if shm.mUnfilteredBrake > 0 else 0.0,
+                "clutch": round(float(shm.mUnfilteredClutch), 3) if shm.mUnfilteredClutch > 0 else 0.0,
+                "steering": round(float(shm.mUnfilteredSteering), 3),
                 "carName": car_name,
                 "trackName": track_location,
             }
