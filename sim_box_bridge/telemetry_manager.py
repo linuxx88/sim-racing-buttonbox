@@ -103,7 +103,9 @@ class TelemetryManager:
             # Fluides & aides
             "fuel": float(raw.get("fuel", 0.0)),
             "maxFuel": float(raw.get("maxFuel", 100.0)),
-            "ers_level": float(raw.get("fuel", 0.0)),  # Fallback ERS pour prototypes/F1
+            "ers_level": float(raw.get("ers_level", 0.0)),
+            "boostActive": bool(raw.get("boostActive", False)),
+            "ersDeploymentMode": int(raw.get("ersDeploymentMode", 0)),
             "wheelsPressure": list(raw.get("wheelsPressure", [0.0, 0.0, 0.0, 0.0])),
             "tyreCoreTemperature": list(raw.get("tyreCoreTemperature", [0.0, 0.0, 0.0, 0.0])),
             "tyreThermal3Zones": tyre_thermal_dict,
@@ -124,6 +126,8 @@ class TelemetryManager:
             "delta_lap": split_ahead,
             "completedLaps": int(raw.get("completedLaps", 0)),
             "numberOfLaps": int(raw.get("numberOfLaps", 0)),
+            "eventTimeRemaining": float(raw.get("eventTimeRemaining", -1.0)),
+            "sessionDuration": float(raw.get("sessionDuration", 0.0)),
             "position": int(raw.get("position", 1)),
             "abs": int(raw.get("abs", 0)),
             "tc": int(raw.get("tc", 0)),

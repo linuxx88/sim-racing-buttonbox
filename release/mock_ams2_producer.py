@@ -119,6 +119,7 @@ class MockAMS2Producer:
                 shm.mCurrentTime = 45.0 + t
                 shm.mThrottle = throttle_input
                 shm.mBrake = brake_input
+                shm.mSequenceNumber += 2
 
                 for i in range(TYRE_MAX):
                     shm.mBrakeTempCelsius[i] = brake_temp

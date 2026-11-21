@@ -574,6 +574,10 @@
 
       line-height: 0.85;
 
+      width: 1.25ch;
+
+      min-width: 1.25ch;
+
       max-width: 1.6ch;
 
       text-align: center;
@@ -581,6 +585,8 @@
       overflow: hidden;
 
       white-space: nowrap;
+
+      font-variant-numeric: tabular-nums;
 
     }
 
@@ -591,6 +597,8 @@
       flex-direction: column;
 
       margin-left: 10px;
+
+      min-width: 72px;
 
     }
 
@@ -603,6 +611,8 @@
       font-weight: 800;
 
       line-height: 1;
+
+      font-variant-numeric: tabular-nums;
 
     }
 
@@ -710,9 +720,9 @@
 
     .wheel-rr { bottom: 6px; right: 0; }
 
-    .wheel-fl.opt, .wheel-fr.opt { background: rgba(0, 230, 118, 0.15); border-color: #00e676; color: #00e676; }
+    .wheel-fl.opt, .wheel-fr.opt, .wheel-rl.opt, .wheel-rr.opt { background: rgba(0, 230, 118, 0.15); border-color: #00e676; color: #00e676; }
 
-    .wheel-rl.opt, .wheel-rr.opt { background: rgba(255, 145, 0, 0.15); border-color: #ff9100; color: #ff9100; }
+    .wheel-badge.hot { background: rgba(255, 23, 68, 0.18); border-color: #ff1744; color: #ff1744; }
 
     .wheel-press { font-size: 10px; font-weight: 800; line-height: 1; }
 
@@ -990,8 +1000,6 @@
 
       background: #282828;
 
-      transition: background-color 0.25s ease;
-
     }
 
 
@@ -1000,7 +1008,7 @@
 
     .svg-brake-disc {
 
-      transition: fill 0.3s ease, filter 0.3s ease;
+      will-change: fill;
 
     }
 
@@ -1812,11 +1820,11 @@
 
               <div class="wheel-thermal-strip">
 
-                <span id="dash-fl-tin" class="thermal-bar" title="Intérieur"></span>
+                <span id="dash-fl-tout" class="thermal-bar" title="Extérieur"></span>
 
                 <span id="dash-fl-tmid" class="thermal-bar" title="Milieu"></span>
 
-                <span id="dash-fl-tout" class="thermal-bar" title="Extérieur"></span>
+                <span id="dash-fl-tin" class="thermal-bar" title="Intérieur"></span>
 
               </div>
 
@@ -1848,11 +1856,11 @@
 
               <div class="wheel-thermal-strip">
 
-                <span id="dash-rl-tin" class="thermal-bar" title="Intérieur"></span>
+                <span id="dash-rl-tout" class="thermal-bar" title="Extérieur"></span>
 
                 <span id="dash-rl-tmid" class="thermal-bar" title="Milieu"></span>
 
-                <span id="dash-rl-tout" class="thermal-bar" title="Extérieur"></span>
+                <span id="dash-rl-tin" class="thermal-bar" title="Intérieur"></span>
 
               </div>
 
@@ -1891,8 +1899,6 @@
       <div id="dash-footer" class="footer_telemetry_bar">
 
         FUEL: 0.0L (0 laps) | TC: 0 | ABS: 0 | BIAS: 0.0% | MAP: 0 | TEMP: H:0°C O:0°C
-
-      </div>
 
       </div>
 
@@ -1970,7 +1976,16 @@
 
       }
 
+      try { sessionStorage.setItem('simbox_active_tab', tabId); } catch (e) {}
+
     }
+
+    try {
+      const savedTab = sessionStorage.getItem('simbox_active_tab');
+      if (savedTab && document.getElementById(savedTab)) {
+        switchTab(savedTab);
+      }
+    } catch (e) {}
 
 
 
@@ -2298,398 +2313,341 @@
 
 
 
-    // Incandescence dynamique des disques de freins
-
-    function updateBrakeDisc(discId, temp) {
-
-      const el = document.getElementById(discId);
-
+    // Incandescence dynamique des disques de freins (mise à jour uniquement sur changement de palier)
+    function updateBrakeDisc(el, temp) {
       if (!el) return;
+      let bucket = 0;
+      if (temp >= 650) bucket = 3;
+      else if (temp >= 450) bucket = 2;
+      else if (temp >= 250) bucket = 1;
 
-      if (temp < 250) {
+      if (el._brakeBucket === bucket) return;
+      el._brakeBucket = bucket;
 
+      if (bucket === 0) {
         el.setAttribute('fill', '#2a2a2a');
-
         el.style.filter = 'none';
-
-      } else if (temp < 450) {
-
+      } else if (bucket === 1) {
         el.setAttribute('fill', '#8d2b0b');
-
         el.style.filter = 'drop-shadow(0 0 2px #d84315)';
-
-      } else if (temp < 650) {
-
+      } else if (bucket === 2) {
         el.setAttribute('fill', '#e65100');
-
         el.style.filter = 'drop-shadow(0 0 5px #ff5722)';
-
       } else {
-
         el.setAttribute('fill', '#ff9100');
-
         el.style.filter = 'drop-shadow(0 0 8px #ffab00)';
-
       }
-
     }
 
+    // Cache des éléments DOM du Dashboard pour éviter tout reflow/requête inutile à 30 Hz
+    const dashEls = {
+      gear: document.getElementById('dash-gear'),
+      speed: document.getElementById('dash-speed'),
+      lapTime: document.getElementById('dash-lap-time'),
+      delta: document.getElementById('dash-delta'),
+      lap: document.getElementById('dash-lap'),
+      pos: document.getElementById('dash-pos'),
+      footer: document.getElementById('dash-footer'),
+      simBadge: document.getElementById('dash-sim-badge'),
+      carInfo: document.getElementById('dash-car-info'),
+      drs: document.getElementById('dash-drs'),
+      ersFill: document.getElementById('dash-ers-fill'),
+      brakes: document.getElementById('dash-brakes'),
+      leds: Array.from(document.querySelectorAll('.shift_lights .led')),
+      wheels: ['fl', 'fr', 'rl', 'rr'].map((w, idx) => ({
+        key: w,
+        upper: w.toUpperCase(),
+        idx,
+        press: document.getElementById(`dash-${w}-press`),
+        temp: document.getElementById(`dash-${w}-temp`),
+        badge: document.getElementById(`dash-wheel-${w}`),
+        tin: document.getElementById(`dash-${w}-tin`),
+        tmid: document.getElementById(`dash-${w}-tmid`),
+        tout: document.getElementById(`dash-${w}-tout`),
+        disc: document.getElementById(`svg-brake-${w}`),
+      })),
+    };
 
+    function setText(el, val) {
+      if (!el) return;
+      const s = String(val);
+      if (el._lastText !== s) {
+        el._lastText = s;
+        el.textContent = s;
+      }
+    }
+
+    function setBarColor(el, color) {
+      if (!el) return;
+      if (el._lastColor !== color) {
+        el._lastColor = color;
+        el.style.backgroundColor = color;
+      }
+    }
+
+    let disconnectedTicks = 0;
 
     // Télémétrie Multi-Simulateurs SSE (/telemetry)
-
     function updateDashboardTelemetry(data) {
-
       if (!data) return;
 
-      const elGear = document.getElementById('dash-gear');
-
-      const elSpeed = document.getElementById('dash-speed');
-
-      const elLapTime = document.getElementById('dash-lap-time');
-
-      const elDelta = document.getElementById('dash-delta');
-
-      const elLap = document.getElementById('dash-lap');
-
-      const elPos = document.getElementById('dash-pos');
-
-      const elFooter = document.getElementById('dash-footer');
-
-      const elSimBadge = document.getElementById('dash-sim-badge');
-
-      const elCarInfo = document.getElementById('dash-car-info');
-
-      const elDrs = document.getElementById('dash-drs');
-
-      const elErsFill = document.getElementById('dash-ers-fill');
-
-      const leds = document.querySelectorAll('.shift_lights .led');
-
-
-
-      // État de connexion & Badge Simulateur
-
-      if (elSimBadge) {
-
-        elSimBadge.classList.remove('active-ams2', 'active-ac');
-
-        if (data.connected && data.sim === 'AMS2') {
-
-          elSimBadge.textContent = 'AMS2';
-
-          elSimBadge.classList.add('active-ams2');
-
-        } else if (data.connected && data.sim === 'Assetto Corsa') {
-
-          elSimBadge.textContent = 'AC';
-
-          elSimBadge.classList.add('active-ac');
-
-        } else {
-
-          elSimBadge.textContent = 'EN ATTENTE';
-
-        }
-
-      }
-
-
-
       if (!data.connected) {
+        disconnectedTicks++;
+        // Grâce d'environ 1 seconde avant de réinitialiser l'affichage pour éviter tout clignotement
+        if (disconnectedTicks < 30 && dashEls.simBadge && dashEls.simBadge._lastSimState) {
+          return;
+        }
+        if (dashEls.simBadge && dashEls.simBadge._lastSimState !== 'wait') {
+          dashEls.simBadge._lastSimState = 'wait';
+          dashEls.simBadge.className = 'dash-sim-badge';
+          setText(dashEls.simBadge, 'EN ATTENTE');
+        }
+        setText(dashEls.gear, 'N');
+        setText(dashEls.speed, '0');
+        setText(dashEls.lapTime, '0:00.00');
+        if (dashEls.delta) {
+          setText(dashEls.delta, '0.00');
+          if (dashEls.delta._lastColor !== '#888888') {
+            dashEls.delta._lastColor = '#888888';
+            dashEls.delta.style.color = '#888888';
+          }
+        }
+        setText(dashEls.lap, 'LAP 0/0');
+        setText(dashEls.pos, 'P0');
+        setText(dashEls.carInfo, 'Activez Shared Memory dans Options');
+        setText(dashEls.footer, 'STANDBY | FUEL: 0.0L | TC: 0 | ABS: 0 | BIAS: 0.0%');
 
-        if (elGear) elGear.textContent = '0';
-
-        if (elSpeed) elSpeed.textContent = '0';
-
-        if (elLapTime) elLapTime.textContent = '0:00.00';
-
-        if (elDelta) { elDelta.textContent = '0.00'; elDelta.style.color = '#888888'; }
-
-        if (elLap) elLap.textContent = 'LAP 0/0';
-
-        if (elPos) elPos.textContent = 'P0';
-
-        if (elCarInfo) elCarInfo.textContent = 'Activez Shared Memory dans Options';
-
-        if (elFooter) elFooter.textContent = 'STANDBY | FUEL: 0.0L | TC: 0 | ABS: 0 | BIAS: 0.0%';
-
-
-
-        leds.forEach(led => led.classList.remove('active-green', 'active-red', 'active-blue'));
-
-
-
-        ['fl', 'fr', 'rl', 'rr'].forEach(w => {
-
-          const p = document.getElementById(`dash-${w}-press`);
-
-          const t = document.getElementById(`dash-${w}-temp`);
-
-          const badge = document.getElementById(`dash-wheel-${w}`);
-
-          if (p) p.textContent = '0.00';
-
-          if (t) t.textContent = '0°C';
-
-          if (badge) badge.classList.remove('opt', 'hot');
-
-          updateBrakeDisc(`svg-brake-${w}`, 0);
-
-          ['in', 'mid', 'out'].forEach(pos => {
-
-            const bar = document.getElementById(`dash-${w}-t${pos}`);
-
-            if (bar) bar.style.backgroundColor = '#282828';
-
-          });
-
+        dashEls.leds.forEach(led => {
+          if (led._lastClass !== 'led') {
+            led._lastClass = 'led';
+            led.className = 'led';
+          }
         });
 
+        dashEls.wheels.forEach(w => {
+          setText(w.press, '0.00');
+          setText(w.temp, '0°C');
+          if (w.badge && w.badge._lastState !== 'idle') {
+            w.badge._lastState = 'idle';
+            w.badge.className = `wheel-badge wheel-${w.key}`;
+          }
+          updateBrakeDisc(w.disc, 0);
+          setBarColor(w.tin, '#282828');
+          setBarColor(w.tmid, '#282828');
+          setBarColor(w.tout, '#282828');
+        });
         return;
-
       }
 
+      disconnectedTicks = 0;
 
+      // État de connexion & Badge Simulateur
+      if (dashEls.simBadge) {
+        const simState = data.sim === 'AMS2' ? 'ams2' : (data.sim === 'Assetto Corsa' ? 'ac' : 'wait');
+        if (dashEls.simBadge._lastSimState !== simState) {
+          dashEls.simBadge._lastSimState = simState;
+          if (simState === 'ams2') {
+            dashEls.simBadge.className = 'dash-sim-badge active-ams2';
+            setText(dashEls.simBadge, 'AMS2');
+          } else if (simState === 'ac') {
+            dashEls.simBadge.className = 'dash-sim-badge active-ac';
+            setText(dashEls.simBadge, 'AC');
+          } else {
+            dashEls.simBadge.className = 'dash-sim-badge';
+            setText(dashEls.simBadge, 'EN ATTENTE');
+          }
+        }
+      }
 
       // Valeurs dynamiques en session active
-
       let gStr = String(data.gearStr || (data.gear !== undefined ? data.gear : 'N')).trim();
-
       if (gStr === '0' || gStr === '') gStr = 'N';
-
+      if (gStr === '-1') gStr = 'R';
       if (gStr.length > 2) gStr = 'N';
 
-      if (elGear) elGear.textContent = gStr;
-
-      if (elSpeed) elSpeed.textContent = Math.round(data.speedKmh || 0);
-
-      if (elLapTime) elLapTime.textContent = data.currentTime || '0:00.00';
-
-      if (elLap) elLap.textContent = `LAP ${data.completedLaps || 0}/${data.numberOfLaps || 0}`;
-
-      if (elPos) elPos.textContent = `P${data.position || 0}`;
-
-
-
-      if (elCarInfo) {
-
-        const c = data.carName ? data.carName : '';
-
-        const tr = data.trackName ? ` | ${data.trackName}` : '';
-
-        elCarInfo.textContent = (c + tr) || data.sim;
-
+      setText(dashEls.gear, gStr);
+      setText(dashEls.speed, Math.round(data.speedKmh || 0));
+      setText(dashEls.lapTime, data.currentTime || '0:00.00');
+      const completedLaps = data.completedLaps || 0;
+      const totalLaps = data.numberOfLaps || 0;
+      if (totalLaps > 0) {
+        setText(dashEls.lap, `LAP ${completedLaps}/${totalLaps}`);
+      } else if (data.eventTimeRemaining !== undefined && data.eventTimeRemaining >= 0) {
+        const totalSec = Math.max(0, Math.floor(data.eventTimeRemaining));
+        const hrs = Math.floor(totalSec / 3600);
+        const mins = Math.floor((totalSec % 3600) / 60);
+        const secs = String(totalSec % 60).padStart(2, '0');
+        const timeStr = hrs > 0
+          ? `${hrs}:${String(mins).padStart(2, '0')}:${secs}`
+          : `${mins}:${secs}`;
+        setText(dashEls.lap, `L${completedLaps} | ${timeStr}`);
+      } else {
+        setText(dashEls.lap, `LAP ${completedLaps}`);
       }
+      setText(dashEls.pos, `P${data.position || 0}`);
 
-
+      if (dashEls.carInfo) {
+        const c = data.carName ? data.carName : '';
+        const tr = data.trackName ? ` | ${data.trackName}` : '';
+        setText(dashEls.carInfo, (c + tr) || data.sim);
+      }
 
       // DRS & Hybride
-
-      if (elDrs) {
-
-        elDrs.classList.remove('avail', 'active');
-
-        if (data.drs === 2 || data.drs === true) elDrs.classList.add('active');
-
-        else if (data.drs === 1) elDrs.classList.add('avail');
-
+      if (dashEls.drs) {
+        const drsState = (data.drs === 2 || data.drs === true) ? 'active' : (data.drs === 1 ? 'avail' : 'off');
+        if (dashEls.drs._lastDrs !== drsState) {
+          dashEls.drs._lastDrs = drsState;
+          dashEls.drs.className = drsState === 'off' ? 'dash-drs-badge' : `dash-drs-badge ${drsState}`;
+        }
       }
 
-      if (elErsFill) {
-
-        const soc = data.kersCharge ? Math.round(data.kersCharge * 100) : 85;
-
-        elErsFill.style.width = `${soc}%`;
-
+      if (dashEls.ersFill) {
+        let soc = 0;
+        if (data.ers_level !== undefined && data.ers_level !== null) {
+          soc = Math.round(Math.max(0, Math.min(100, Number(data.ers_level) || 0)));
+        } else if (data.kersCharge !== undefined && data.kersCharge !== null) {
+          soc = Math.round(Math.max(0, Math.min(100, (Number(data.kersCharge) || 0) * 100)));
+        }
+        const wStr = `${soc}%`;
+        if (dashEls.ersFill._lastWidth !== wStr) {
+          dashEls.ersFill._lastWidth = wStr;
+          dashEls.ersFill.style.width = wStr;
+        }
       }
 
-
-
-      // Delta dynamique en direct
-
-      if (elDelta) {
-
+      // Delta dynamique en direct (priorité au delta au tour)
+      if (dashEls.delta) {
         let deltaVal = 0.0;
-
-        if (data.splitTimeAhead !== undefined && data.splitTimeAhead !== 0.0) {
-
-          deltaVal = data.splitTimeAhead;
-
-        } else if (data.delta !== undefined) {
-
+        if (data.delta !== undefined && data.delta !== null) {
           deltaVal = parseFloat(data.delta) || 0;
-
+        } else if (data.splitTimeAhead !== undefined && data.splitTimeAhead !== 0.0) {
+          deltaVal = parseFloat(data.splitTimeAhead) || 0;
         }
-
         if (deltaVal !== 0.0) {
-
-          elDelta.textContent = (deltaVal > 0 ? '+' : '') + deltaVal.toFixed(2);
-
-          elDelta.style.color = deltaVal < 0 ? '#00e676' : '#ff1744';
-
+          setText(dashEls.delta, (deltaVal > 0 ? '+' : '') + deltaVal.toFixed(2));
+          const c = deltaVal < 0 ? '#00e676' : '#ff1744';
+          if (dashEls.delta._lastColor !== c) {
+            dashEls.delta._lastColor = c;
+            dashEls.delta.style.color = c;
+          }
         } else {
-
-          elDelta.textContent = '0.00';
-
-          elDelta.style.color = '#888888';
-
+          setText(dashEls.delta, '0.00');
+          if (dashEls.delta._lastColor !== '#888888') {
+            dashEls.delta._lastColor = '#888888';
+            dashEls.delta.style.color = '#888888';
+          }
         }
-
       }
-
-
 
       // Illumination dynamique des 16 LEDs selon regime / maxRpm (avec flash au rupteur)
-      const maxRpm = data.maxRpm || (currentProfile === 'f1' ? 15000 : 8500);
-      const ratio = maxRpm > 0 ? (data.rpms / maxRpm) : 0;
+      const maxRpm = (data.maxRpm && data.maxRpm > 1000) ? data.maxRpm : (currentProfile === 'f1' ? 15000 : 8500);
+      const rpms = Math.max(0, data.rpms || 0);
+      const ratio = maxRpm > 0 ? (rpms / maxRpm) : 0;
       let litCount = 0;
-      if (ratio > 0.60) {
-        litCount = Math.min(16, Math.max(1, Math.round(((ratio - 0.60) / 0.40) * 16)));
+      if (ratio > 0.55) {
+        litCount = Math.min(16, Math.max(1, Math.round(((ratio - 0.55) / 0.43) * 16)));
       }
       const isShiftPoint = ratio >= 0.97;
-      const flashOn = Math.floor(Date.now() / 70) % 2 === 0;
-      leds.forEach((led, idx) => {
-        led.classList.remove('active-green', 'active-red', 'active-blue');
+      const flashOn = Math.floor(Date.now() / 120) % 2 === 0;
+      dashEls.leds.forEach((led, idx) => {
+        let cls = 'led';
         if (isShiftPoint) {
-          if (flashOn) led.classList.add('active-blue');
+          if (flashOn) cls = 'led active-blue';
         } else if (idx < litCount) {
-          if (idx < 5) led.classList.add('active-green');
-          else if (idx < 12) led.classList.add('active-red');
-          else led.classList.add('active-blue');
+          if (idx < 5) cls = 'led active-green';
+          else if (idx < 12) cls = 'led active-red';
+          else cls = 'led active-blue';
+        }
+        if (led._lastClass !== cls) {
+          led._lastClass = cls;
+          led.className = cls;
         }
       });
 
-
-
       // Pression et Heatmap 3 Zones des 4 roues
-
-      const wheels = ['fl', 'fr', 'rl', 'rr'];
+      const zonesList = Array.isArray(data.tyreThermal3ZonesList)
+        ? data.tyreThermal3ZonesList
+        : (Array.isArray(data.tyreThermal3Zones) ? data.tyreThermal3Zones : null);
+      const zonesDict = (!Array.isArray(data.tyreThermal3Zones) && data.tyreThermal3Zones && typeof data.tyreThermal3Zones === 'object')
+        ? data.tyreThermal3Zones
+        : null;
 
       if (Array.isArray(data.wheelsPressure) && Array.isArray(data.tyreCoreTemperature)) {
+        dashEls.wheels.forEach(w => {
+          const press = data.wheelsPressure[w.idx];
+          const temp = data.tyreCoreTemperature[w.idx];
 
-        wheels.forEach((w, idx) => {
+          if (press !== undefined) setText(w.press, press.toFixed(2));
+          if (temp !== undefined) setText(w.temp, `${Math.round(temp)}°C`);
 
-          const press = data.wheelsPressure[idx];
-
-          const temp = data.tyreCoreTemperature[idx];
-
-          const elP = document.getElementById(`dash-${w}-press`);
-
-          const elT = document.getElementById(`dash-${w}-temp`);
-
-          const badge = document.getElementById(`dash-wheel-${w}`);
-
-
-
-          if (elP && press !== undefined) elP.textContent = press.toFixed(2);
-
-          if (elT && temp !== undefined) elT.textContent = `${Math.round(temp)}°C`;
-
-          if (badge && temp !== undefined) {
-
-            badge.classList.remove('opt', 'hot');
-
-            if (temp > 95) badge.classList.add('hot');
-
-            else if (temp >= 75) badge.classList.add('opt');
-
+          if (w.badge && temp !== undefined) {
+            const bState = temp > 95 ? 'hot' : (temp >= 75 ? 'opt' : 'idle');
+            if (w.badge._lastState !== bState) {
+              w.badge._lastState = bState;
+              w.badge.className = bState === 'idle'
+                ? `wheel-badge wheel-${w.key}`
+                : `wheel-badge wheel-${w.key} ${bState}`;
+            }
           }
 
-
-
-          // Rendu thermique des 3 zones (Intérieur / Milieu / Extérieur)
-
-          if (Array.isArray(data.tyreThermal3Zones) && data.tyreThermal3Zones[idx]) {
-
-            const z = data.tyreThermal3Zones[idx];
-
-            const barIn = document.getElementById(`dash-${w}-tin`);
-
-            const barMid = document.getElementById(`dash-${w}-tmid`);
-
-            const barOut = document.getElementById(`dash-${w}-tout`);
-
-            if (barIn) barIn.style.backgroundColor = getThermalColor(z.inside);
-
-            if (barMid) barMid.style.backgroundColor = getThermalColor(z.middle);
-
-            if (barOut) barOut.style.backgroundColor = getThermalColor(z.outside);
-
+          const z = (zonesList && zonesList[w.idx]) || (zonesDict && zonesDict[w.upper]);
+          if (z) {
+            setBarColor(w.tin, getThermalColor(z.inside));
+            setBarColor(w.tmid, getThermalColor(z.middle));
+            setBarColor(w.tout, getThermalColor(z.outside));
           }
-
         });
-
       }
-
-
 
       // Incandescence dynamique des 4 disques de frein
-
       if (Array.isArray(data.brakeTemp)) {
-
-        wheels.forEach((w, idx) => {
-
-          updateBrakeDisc(`svg-brake-${w}`, data.brakeTemp[idx]);
-
+        dashEls.wheels.forEach(w => {
+          updateBrakeDisc(w.disc, data.brakeTemp[w.idx]);
         });
-
-        const elBrakes = document.getElementById('dash-brakes');
-
-        if (elBrakes && data.brakeTemp[0] !== undefined) {
-
-          elBrakes.textContent = `FREINS: ${Math.round(data.brakeTemp[0])}°C | ${Math.round(data.brakeTemp[1])}°C`;
-
+        if (dashEls.brakes && data.brakeTemp.length >= 4) {
+          const fl = Math.round(data.brakeTemp[0] || 0);
+          const fr = Math.round(data.brakeTemp[1] || 0);
+          const rl = Math.round(data.brakeTemp[2] || 0);
+          const rr = Math.round(data.brakeTemp[3] || 0);
+          setText(dashEls.brakes, `FREINS: ${fl}/${fr} | ${rl}/${rr}°C`);
+        } else if (dashEls.brakes && data.brakeTemp[0] !== undefined) {
+          setText(dashEls.brakes, `FREINS: ${Math.round(data.brakeTemp[0])}°C | ${Math.round(data.brakeTemp[1] || 0)}°C`);
         }
-
       }
-
-
 
       // Bandeau inférieur
-
-      if (elFooter) {
-
+      if (dashEls.footer) {
         const fuel = (data.fuel || 0).toFixed(1);
-
         const maxFuel = (data.maxFuel || 100).toFixed(0);
-
         const bias = (data.brakeBias || 0).toFixed(1);
-
         const road = Math.round(data.roadTemp || 0);
-
         const air = Math.round(data.airTemp || 0);
-
-        elFooter.textContent = `SIM: ${data.sim} | FUEL: ${fuel}/${maxFuel}L | TC: ${data.tc || 0} | ABS: ${data.abs || 0} | BIAS: ${bias}% | TEMP: P:${road}°C A:${air}°C`;
-
+        setText(dashEls.footer, `SIM: ${data.sim} | FUEL: ${fuel}/${maxFuel}L | TC: ${data.tc || 0} | ABS: ${data.abs || 0} | BIAS: ${bias}% | TEMP: P:${road}°C A:${air}°C`);
       }
-
     }
 
-
+    let pendingTelemetryData = null;
+    let rafScheduled = false;
 
     function initTelemetrySSE() {
-
       const eventSource = new EventSource('/telemetry');
-
       eventSource.onmessage = (event) => {
-
         try {
-
-          const data = JSON.parse(event.data);
-
-          updateDashboardTelemetry(data);
-
+          pendingTelemetryData = JSON.parse(event.data);
+          if (!rafScheduled) {
+            rafScheduled = true;
+            requestAnimationFrame(() => {
+              rafScheduled = false;
+              if (pendingTelemetryData) {
+                updateDashboardTelemetry(pendingTelemetryData);
+              }
+            });
+          }
         } catch (e) {}
-
       };
-
       eventSource.onerror = () => {
-
         // Reconnexion automatique assurée par le navigateur
-
       };
-
     }
 
 

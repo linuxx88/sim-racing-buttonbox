@@ -3,13 +3,13 @@
 [![Platform: Windows](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](#)
 [![Client: Android / Web](https://img.shields.io/badge/Client-Android%20%2F%20Web-3DDC84?logo=android&logoColor=white)](#)
 [![Sim: Automobilista 2](https://img.shields.io/badge/Primary%20Sim-Automobilista%202-FF4500)](#)
-[![Sim: Assetto Corsa](https://img.shields.io/badge/Supported-Assetto%20Corsa-darkred)](#)
+[![Sim: Assetto Corsa](https://img.shields.io/badge/Secondary%20Sim-Assetto%20Corsa%20(WIP)-darkred)](#)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](#)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 Ultra-low latency touch Button Box and real-time Telemetry Dashboard for Android smartphones and tablets, powered by a lightweight standalone Windows bridge.
 
-Designed primarily for **Automobilista 2 (AMS2)** via `$pcars2$` Windows Shared Memory, with secondary support for **Assetto Corsa** (`acpmf_physics`).
+Designed primarily for **Automobilista 2 (AMS2)** via `$pcars2$` Windows Shared Memory, with partial / work-in-progress support for **Assetto Corsa** (`acpmf_physics`).
 
 ---
 
@@ -45,6 +45,7 @@ Designed primarily for **Automobilista 2 (AMS2)** via `$pcars2$` Windows Shared 
                  │ (Zero-latency USB via ADB Tunnel or WiFi LAN)
 ┌────────────────▼────────────────────────────────────────┐
 │               SimBoxBridge (Windows PC)                 │
+│  - main.py              : Entrypoint & lifecycle manager│
 │  - server.py            : SSE telemetry stream (30 Hz)  │
 │  - bridge.py            : WebSocket hub & command router│
 │  - injector.py          : DirectInput key injection     │
@@ -77,7 +78,7 @@ cd sim-racing-buttonbox/sim_box_bridge
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements-win.txt
-python bridge.py
+python main.py
 ```
 
 ---
@@ -125,22 +126,24 @@ python bridge.py
 > 2. Go to **Options > System**.
 > 3. Set **Shared Memory** to **`Project CARS 2`**.
 
-In the AMS2 control settings, assign the following keys (or adjust mappings in `sim_box_bridge/injector.py`):
+In the AMS2 control settings, assign the following keys (or adjust scan codes in `sim_box_bridge/injector.py`):
 
 | Action | Injected Keystroke |
 | :--- | :--- |
 | **DRS** | `D` |
-| **Brake Bias + / -** | `Ctrl + Up` / `Ctrl + Down` |
-| **Traction Control (TC) + / -** | `T` / `Shift + T` |
-| **Engine Brake + / -** | `E` / `Shift + E` |
-| **ABS + / -** | `A` / `Shift + A` |
-| **Headlights / High Beam Flash** | `L` / `F` |
-| **Wipers** | `W` |
+| **Brake Bias + / -** | `V` / `B` |
+| **Traction Control (TC) + / -** | `N` / `M` |
+| **Engine Brake + / -** | `U` / `J` |
+| **ABS + / -** | `Y` / `H` |
+| **Headlights Toggle / Flash** | `L` / `K` |
+| **Wipers** | `O` |
 | **Pit Limiter** | `P` |
-| **Seat Adjustments (Up / Down / Fwd / Back)** | `Home` / `End` / `PageUp` / `PageDown` |
-| **Pitch & FOV** | `Insert` / `Delete` |
+| **Seat Adjustments (Up / Down / Fwd / Back)** | `W` / `S` / `Q` / `E` |
+| **Pitch (Up / Down) & Yaw (Left / Right)** | `R` / `F` & `Z` / `C` |
+| **FOV (+ / -)** | `T` / `G` |
 
-### 2. Assetto Corsa (AC)
+### 2. Assetto Corsa (AC) — *Work in Progress*
+- Basic telemetry (`speedKmh`, `gear`, `rpms`, `fuel`, `wheelsPressure`, `tyreCoreTemperature`, `tyreThermal3Zones`, `brakeTemp`, `currentTime`, `completedLaps`) is implemented in `telemetry_ac.py`, but full parity with AMS2 (best/last lap, live delta, pedals, DRS/ERS, `tyreWear` calibration, and AC-specific key mappings) is still pending on-track validation.
 - Enable Shared Memory in **Content Manager**: *Settings > Custom Shaders Patch > General Patch Settings*.
 - Telemetry streaming goes live once you hit "Drive" on the track (`LIVE` session).
 
@@ -150,21 +153,31 @@ In the AMS2 control settings, assign the following keys (or adjust mappings in `
 
 ```
 ├── release/
-│   └── SimBoxBridge.exe          # Standalone portable Windows binary (~9.5 MB)
+│   ├── SimBoxBridge.exe          # Standalone portable Windows binary
+│   ├── SimBoxBridge.bat          # Launcher script
+│   ├── adb.exe                   # Bundled Android Debug Bridge + DLLs
+│   └── ...                       # Embedded Python runtime & bridge scripts
 ├── sim_box_bridge/
-│   ├── bridge.py                 # Main WebSocket server & input routing
+│   ├── main.py                   # Main entrypoint (starts server, bridge & watcher)
+│   ├── bridge.py                 # WebSocket server & input routing
 │   ├── server.py                 # Static HTTP server & SSE stream (/telemetry)
 │   ├── index.html                # Responsive Web UI (Race, Cockpit, Dashboard)
 │   ├── injector.py               # Windows DirectInput keyboard injection engine
 │   ├── telemetry_manager.py      # Multi-sim orchestrator (AMS2 & AC)
 │   ├── telemetry_ams2.py         # AMS2 ($pcars2$) Shared Memory reader
-│   ├── telemetry_ac.py           # Assetto Corsa Shared Memory reader
+│   ├── telemetry_ac.py           # Assetto Corsa Shared Memory reader (WIP)
+│   ├── SharedMemory.h            # Official Project CARS 2 / AMS2 C++ header
 │   ├── mock_ams2_producer.py     # Standalone synthetic telemetry generator
 │   ├── test_ams2_integration.py  # Unit test suite for AMS2 telemetry
 │   ├── test_e2e_sse.py           # E2E integration test for telemetry manager
 │   ├── watcher.py                # Process monitor and ADB reverse trigger
+│   ├── run.bat                   # Dev launcher script
 │   ├── requirements.txt          # Cross-platform dependencies
 │   └── requirements-win.txt      # Windows-specific dependencies
+├── tools/
+│   └── generate_struct.py        # Helper to generate ctypes structs from SharedMemory.h
+├── SimBoxBridge.spec             # PyInstaller build specification
+├── AG_STATE.md                   # Current sprint state & debugging notes
 ├── TODO.md                       # Roadmap & completed tasks
 └── README.md
 ```

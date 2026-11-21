@@ -4,52 +4,18 @@
 - Finalisation d'une Button Box tactile Android ultra-faible latence et d'un Dashboard télémétrique multi-catégorie temps réel (30 Hz SSE) pour simulateurs de course PC (priorité **Automobilista 2 (AMS2)** via `$pcars2$`, support secondaire **Assetto Corsa** via `acpmf`), pilotés par un pont Windows autonome (`SimBoxBridge.exe`).
 
 ## 2. Complété et Validé Aujourd'hui
-- **Résolution du Bug des Diodes RPM Inversées et du Numéro Rapport Erroné (11635573)** :
-  - **Cause racine identifiée** : Extraction de l'en-tête C++ officiel d'Automobilista 2 (`G:\new folder\steamapps\common\Automobilista 2\Support\SharedMemory\AMS2_SharedMemoryExampleApp\SharedMemory.h`). L'ancienne cartographie Python omettait 6 variables de secteur (24 octets) et 4 variables de pédales/direction (16 octets), décalant les offsets mémoire :
-    - `mRpm` lisait en réalité `mWaterTempCelsius` (~90°C).
-    - `mMaxRPM` lisait en réalité `mWaterPressureKPa` (~120-150 kPa).
-    - `mGear` lisait `mFuelPressureKPa` (affichant le nombre géant `11635573`).
-    - Au freinage, la pression d'eau chutait, faisant monter le ratio Temp/Pression au-dessus de 0.60 et allumant les diodes à l'envers !
-  - **Correction intégrale** : Remplacement de `AMS2SharedMemory` par les 158 champs complets et conformes bit-par-bit à `SharedMemory.h` (taille exacte de 20 700 octets validée).
-  - **Nouvelles télémétries actives** :
-    - Répartition de freinage dynamique (`mBrakeBias`) affichée dans le footer (ex: `BIAS: 54.0%`).
-    - Niveaux ABS & TC (`mAntiLockSetting`, `mTractionControlSetting`) transmis au dashboard.
-    - Animation de flash stroboscopique bleu sur les 16 LEDs au rupteur / shift point (`ratio >= 0.97`).
-  - **Recompilation du Binaire Autonome** :
-    - `release/SimBoxBridge.exe` recompilé avec succès via PyInstaller 6.14.1 sous Python 3.12 (14,9 Mo), avec `index.html` embarqué.
-    - Remplacement à chaud sans collision de verrouillage Windows.
-    - Tous les tests d'intégration et E2E SSE validés à 100%.
-- **Lecteur Mémoire Partagée Automobilista 2 (`telemetry_ams2.py`)** :
-  - Implémentation complète `ctypes.Structure` de la spécification `$pcars2$` (pack MSVC 4 octets).
-  - Validation préalable de l'existence du bloc via `OpenFileMappingW(FILE_MAP_READ, False, "$pcars2$")`.
-  - Désérialisation instantanée via `from_buffer_copy` avec sécurité anti-corruption et détection de heartbeat (temps au tour figé / sortie de jeu).
-  - Normalisation des unités : vitesse en km/h, pressions en bar (`PSI / 14.5038`), rapports (`-1=R, 0=N, 1..n`), températures disques en °C, et usure résiduelle en %.
-- **Décomposition Thermique Pneus 3 Zones (`Inside`, `Middle`, `Outside`)** :
-  - Extraction de `mTyreTempLeft`, `mTyreTempCenter`, `mTyreTempRight` avec inversion géométrique appropriée selon le côté (roues gauches vs droites).
-- **Orchestrateur Multi-Simulateurs (`telemetry_manager.py`)** :
-  - Priorisation automatique d'AMS2 avec bascule transparente vers Assetto Corsa.
-  - Normalisation unifiée du payload JSON pour le flux `/telemetry` à 30 Hz.
-- **Frontend & Dashboard Multi-Catégories (`index.html`)** :
-  - Badge dynamique du simulateur actif (`AMS2`, `Assetto Corsa`, ou `EN ATTENTE`).
-  - Sélecteur de profil instantané en en-tête (`GT3`, `F1`, `HYPERCAR`).
-  - Rampe 16 LED animée et étalonnée selon la classe (8 500 RPM pour GT3, 15 000 RPM pour F1).
-  - Barres thermiques 3 zones pour les 4 pneus (bleu < 75°C, vert 80-95°C, orange > 95°C, rouge > 105°C).
-  - Disques de frein SVG avec effet d'incandescence dynamique (glow orangé/rougeoyant en cas de gros freinage).
-  - Delta au tour dynamique (-0.14 vert / +0.32 rouge), affichage DRS et jauge de batterie ERS / Hybride.
-- **Outils de Test & Simulation** :
-  - `mock_ams2_producer.py` : Générateur autonome et multithread de télémétrie `$pcars2$` (cycles réalistes de pleine accélération et freinages violents).
-  - `test_ams2_integration.py` : Suite de tests unitaires validant la connexion, l'extraction et le fallback hors-jeu.
-  - `test_e2e_sse.py` : Test d'intégration de bout en bout validant le pipeline complet `Mock -> TelemetryManager -> Payload unifié`.
-- **Binaire Autonome Windows (`SimBoxBridge.exe`)** :
-  - Compilation réussie avec PyInstaller 6.14.1 sous Python 3.12 (taille : ~9.5 Mo dans `release/SimBoxBridge.exe`).
-  - Inclusion autonome de `index.html` et de tous les modules de télémétrie et d'injection.
-- **Documentation & Spécifications** :
-  - `README.md` mis à jour avec le guide d'activation de la mémoire partagée dans AMS2 (*Options > System > Shared Memory = Project CARS 2*), l'architecture complète et les instructions ADB.
-  - `TODO.md` mis à jour avec toutes les tâches validées et le backlog des futures extensions.
+- **Correction des 3 Bugs En Jeu (Diodes RPM Inversées, Rapport Bloqué sur N, et Rafraîchissement Écran Rapide)** :
+  1. **Élimination des instances fantômes (`SimBoxBridge.running.exe` / `SimBoxBridge.old.exe`)** :
+     - Lors de la recompilation précédente, l'ancien exécutable (`SimBoxBridge.running.exe`, compilé avant l'alignement de `SharedMemory.h`) avait été renommé à chaud sans être arrêté. Sous Windows, ce processus fantôme conservait le port `5000` ouvert avec l'ancienne structure décalée de 24/40 octets (où `mRpm`/`mMaxRPM` lisaient la température/pression d'eau et `mGear` restait forcé à `N`).
+     - Suppression des binaires résiduels `.running.exe` et `.old.exe`, ajout d'un nettoyage automatique (`kill_stale_instances()`) au démarrage de [`main.py`](file:///k:/simbox/sim-box/sim_box_bridge/main.py) et dans [`SimBoxBridge.bat`](file:///k:/simbox/sim-box/release/SimBoxBridge.bat), et ajout des en-têtes `Cache-Control: no-store` dans [`bridge.py`](file:///k:/simbox/sim-box/sim_box_bridge/bridge.py).
+  2. **Suppression du Rafraîchissement / Clignotement de l'Écran en Roulage** :
+     - **Cause A (Heartbeat `mCurrentTime` sur tour de sortie / tour invalidé)** : Dans AMS2, `mCurrentTime` vaut `-1.0` pendant tout le tour de sortie des stands (*Outlap*) ou lorsqu'un tour est invalidé. L'ancien heartbeat fermait la mémoire partagée toutes les 2,5 s en croyant le jeu figé, faisant basculer le dashboard sur `0 / STANDBY` pendant une trame avant de se reconnecter. Remplacé dans [`telemetry_ams2.py`](file:///k:/simbox/sim-box/sim_box_bridge/telemetry_ams2.py) par une signature basée sur `mSequenceNumber` + variables physiques (`mRpm`, `mSpeed`, `mUnfilteredSteering`) et typage 64-bit `wintypes.HANDLE`.
+     - **Cause B (Relances intempestives `adb shell am start` par le Watcher)** : En roulage, [`watcher.py`](file:///k:/simbox/sim-box/sim_box_bridge/watcher.py) / [`main.py`](file:///k:/simbox/sim-box/sim_box_bridge/main.py) relançait parfois l'intent Android `VIEW http://localhost:5000` après un micro-délai ADB, forçant Chrome Android à recharger la page. Désormais, tant qu'un client WebSocket ou SSE est connecté (`bridge.has_active_clients()`), le watcher ne lance plus `tasklist` ni `am start`.
+     - **Cause C (Reflows DOM & Transitions CSS à 30 Hz dans `index.html`)** : Synchronisation via `requestAnimationFrame`, mise en cache des nœuds DOM, mise à jour différentielle stricte (`setText`, paliers de freins, classes LEDs), police `tabular-nums` à largeur fixe sur le rapport/vitesse, et persistance de l'onglet actif dans `sessionStorage`.
 
 ## 3. Tâches en Cours & Blocages Actifs
-- **Tâches en cours** : Toutes les phases du plan de travail sont achevées, testées et validées.
-- **Blocages actifs** : Aucun blocage technique ou système.
+- **Tâches en cours** : Finalisation de la recompilation propre de `release/SimBoxBridge.exe`.
+- **Blocages actifs** : Aucun.
 
 ## 4. Prochaine Étape Atomique Exacte
-- Mettre en scène une session live en jeu sous Automobilista 2 avec `SimBoxBridge.exe` lancé et le téléphone connecté en USB via ADB pour valider le comportement in situ en course.
+- Tester en piste sous Automobilista 2 avec le nouveau `release/SimBoxBridge.exe`.

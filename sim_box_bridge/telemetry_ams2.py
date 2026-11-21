@@ -43,6 +43,13 @@ GEAR_NAMES = {
 
 # Windows API pour vérification de l'existence du mapping mémoire
 FILE_MAP_READ = 0x0004
+if sys.platform == "win32":
+    from ctypes import wintypes
+    _kernel32 = ctypes.windll.kernel32
+    _kernel32.OpenFileMappingW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
+    _kernel32.OpenFileMappingW.restype = wintypes.HANDLE
+    _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    _kernel32.CloseHandle.restype = wintypes.BOOL
 
 
 class ParticipantInfo(Structure):
@@ -245,7 +252,7 @@ class Automobilista2Reader:
     def __init__(self):
         self.mmap_shm: Optional[mmap.mmap] = None
         self.struct_size = ctypes.sizeof(AMS2SharedMemory)
-        self._last_time: float = -1.0
+        self._last_signature: Optional[tuple] = None
         self._last_change_ts: float = time.time()
 
     def _shared_memory_exists(self) -> bool:
@@ -253,9 +260,9 @@ class Automobilista2Reader:
         if sys.platform != "win32":
             return False
         try:
-            h = ctypes.windll.kernel32.OpenFileMappingW(FILE_MAP_READ, False, self.SHM_NAME)
+            h = _kernel32.OpenFileMappingW(FILE_MAP_READ, False, self.SHM_NAME)
             if h:
-                ctypes.windll.kernel32.CloseHandle(h)
+                _kernel32.CloseHandle(h)
                 return True
         except Exception:
             pass
@@ -265,12 +272,12 @@ class Automobilista2Reader:
         if sys.platform != "win32":
             return False
 
+        if self.mmap_shm is not None:
+            return True
+
         if not self._shared_memory_exists():
             self.close()
             return False
-
-        if self.mmap_shm is not None:
-            return True
 
         for fileno in (-1, 0):
             try:
@@ -280,7 +287,7 @@ class Automobilista2Reader:
                     tagname=self.SHM_NAME,
                     access=mmap.ACCESS_READ
                 )
-                self._last_time = -1.0
+                self._last_signature = None
                 self._last_change_ts = time.time()
                 return True
             except Exception:
@@ -296,7 +303,24 @@ class Automobilista2Reader:
             return {"connected": False, "sim": "AMS2", "in_game": False}
 
         try:
-            shm = AMS2SharedMemory.from_buffer_copy(self.mmap_shm)
+            seq_offset = AMS2SharedMemory.mSequenceNumber.offset
+            shm = None
+            for attempt in range(5):
+                seq_before = c_uint.from_buffer_copy(self.mmap_shm, seq_offset).value
+                if seq_before & 1:
+                    if attempt < 4:
+                        time.sleep(0.0002)
+                    continue
+                candidate = AMS2SharedMemory.from_buffer_copy(self.mmap_shm)
+                seq_after = c_uint.from_buffer_copy(self.mmap_shm, seq_offset).value
+                if seq_before == seq_after and (seq_before & 1) == 0 and candidate.mSequenceNumber == seq_before:
+                    shm = candidate
+                    break
+                if attempt < 4:
+                    time.sleep(0.0002)
+
+            if shm is None:
+                return {"connected": False, "sim": "AMS2", "in_game": False}
 
             # mGameState : 0=EXITED, 1=FRONT_END, 2=INGAME_PLAYING, 3=PAUSED, 4=INMENU, 5=RESTARTING, 6=REPLAY
             in_game = (shm.mGameState in (2, 3, 4, 5, 6))
@@ -312,16 +336,24 @@ class Automobilista2Reader:
                     "status": int(shm.mGameState)
                 }
 
-            # Détection de heartbeat (si le jeu est mort ou figé en mode course)
-            current_time_val = float(shm.mCurrentTime)
+            # Détection de heartbeat basée sur mSequenceNumber + variables physiques
+            # (évite toute coupure lors des tours de sortie des stands où mCurrentTime reste à -1.0)
             now = time.time()
-            if in_game:
-                if abs(current_time_val - self._last_time) > 0.0001:
-                    self._last_time = current_time_val
-                    self._last_change_ts = now
-                elif (now - self._last_change_ts) > 2.5:
-                    self.close()
-                    return {"connected": False, "sim": "AMS2", "in_game": False}
+            sig = (
+                int(shm.mSequenceNumber),
+                int(shm.mGameState),
+                round(float(shm.mCurrentTime), 3),
+                round(float(shm.mRpm), 1),
+                round(float(shm.mSpeed), 2),
+                round(float(shm.mUnfilteredSteering), 3),
+            )
+            if sig != self._last_signature:
+                self._last_signature = sig
+                self._last_change_ts = now
+            elif shm.mGameState == 2 and (now - self._last_change_ts) > 10.0:
+                # Si plus aucune trame ni micro-variation pendant 10s en plein roulage (crash du jeu)
+                self.close()
+                return {"connected": False, "sim": "AMS2", "in_game": False}
 
             # Conversion de la vitesse m/s -> km/h
             speed_kmh = round(float(shm.mSpeed) * 3.6, 1) if shm.mSpeed > 0 else 0.0
@@ -335,9 +367,13 @@ class Automobilista2Reader:
                 gear = 0
                 gear_str = "N"
 
-            # Régimes moteurs (RPM & MaxRPM)
-            rpms = int(shm.mRpm) if shm.mRpm > 0 else 0
-            max_rpm = int(shm.mMaxRPM) if shm.mMaxRPM > 0 else 8500
+            # Régimes moteurs (RPM & MaxRPM avec fallback mEngineSpeed rad/s)
+            rpms = int(round(float(shm.mRpm))) if shm.mRpm > 0 else 0
+            if rpms == 0 and shm.mEngineSpeed > 0:
+                rpms = int(round(float(shm.mEngineSpeed) * 9.5492966))
+            max_rpm = int(round(float(shm.mMaxRPM))) if shm.mMaxRPM > 1000 else 8500
+            if rpms > max_rpm:
+                max_rpm = rpms
 
             # Carburant (mFuelCapacity en litres, mFuelLevel en ratio 0.0->1.0)
             max_fuel = round(float(shm.mFuelCapacity), 1) if shm.mFuelCapacity > 0 else 100.0
@@ -382,9 +418,9 @@ class Automobilista2Reader:
                 for b in shm.mBrakeTempCelsius
             ]
 
-            # Usure résiduelle des pneus (% restante)
+            # Usure résiduelle des pneus (mTyreWear: 0.0=neuf -> 1.0=usé, converti en % de vie restante)
             tyre_wear = [
-                round(float(w) * 100.0, 1) if w > 0 else 100.0
+                round(max(0.0, min(1.0, 1.0 - float(w))) * 100.0, 1)
                 for w in shm.mTyreWear
             ]
 
@@ -440,6 +476,17 @@ class Automobilista2Reader:
             else:
                 tc_val = 0
 
+            # ERS / Boost (mBoostAmount: 0.0->100.0)
+            ers_level = round(max(0.0, min(100.0, float(shm.mBoostAmount))), 1)
+            boost_active = bool(shm.mBoostActive)
+            ers_deployment_mode = int(shm.mErsDeploymentMode)
+
+            # Durée de session (minutes) et temps restant (secondes) pour les courses chronométrées
+            raw_time_remaining = float(shm.mEventTimeRemaining)
+            event_time_remaining = round(raw_time_remaining / 1000.0, 1) if raw_time_remaining >= 0.0 else -1.0
+            raw_session_duration = float(shm.mSessionDuration)
+            session_duration = round(raw_session_duration, 1) if raw_session_duration > 0.0 else 0.0
+
             # Pédales et direction (filtrées avec fallback non-filtrées)
             throttle = round(float(shm.mThrottle), 3) if shm.mThrottle > 0 else round(float(shm.mUnfilteredThrottle), 3)
             brake = round(float(shm.mBrake), 3) if shm.mBrake > 0 else round(float(shm.mUnfilteredBrake), 3)
@@ -459,6 +506,9 @@ class Automobilista2Reader:
                 "maxRpm": max_rpm,
                 "fuel": fuel_level,
                 "maxFuel": max_fuel,
+                "ers_level": ers_level,
+                "boostActive": boost_active,
+                "ersDeploymentMode": ers_deployment_mode,
                 "wheelsPressure": pressures,
                 "tyreCoreTemperature": temps,
                 "tyreThermal3Zones": tyre_thermal_3zones,
@@ -475,6 +525,8 @@ class Automobilista2Reader:
                 "delta": split_delta,
                 "completedLaps": completed_laps,
                 "numberOfLaps": int(shm.mLapsInEvent),
+                "eventTimeRemaining": event_time_remaining,
+                "sessionDuration": session_duration,
                 "position": position,
                 "abs": abs_val,
                 "tc": tc_val,
@@ -497,7 +549,7 @@ class Automobilista2Reader:
             except Exception:
                 pass
             self.mmap_shm = None
-        self._last_time = -1.0
+        self._last_signature = None
 
 
 _ams2_reader_instance: Optional[Automobilista2Reader] = None
